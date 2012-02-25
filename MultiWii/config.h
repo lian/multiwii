@@ -31,7 +31,7 @@
 //#define I2C_SPEED 400000L   //400kHz fast mode, it works only with some WMP clones
 
 //enable internal I2C pull ups
-//#define INTERNAL_I2C_PULLUPS
+#define INTERNAL_I2C_PULLUPS
 
 
 //****** advanced users settings   *************
@@ -39,7 +39,11 @@
 //#define LED_RING
 
 /* This option should be uncommented if ACC Z is accurate enough when motors are running*/
-//#define TRUSTED_ACCZ
+/* should now be ok with BMA020 and BMA180 ACC */
+#define TRUSTED_ACCZ
+
+/* This will activate the ACC-Inflight calibration if unchecked */  
+//#define InflightAccCalibration
 
 /* PIN A0 and A1 instead of PIN D5 & D6 for 6 motors config and promini config
    This mod allow the use of a standard receiver on a pro mini
@@ -87,6 +91,7 @@
 //#define FREEIMUv035     // FreeIMU v0.3.5 no baro
 //#define FREEIMUv035_MS  // FreeIMU v0.3.5_MS                                                <- confirmed by Alex
 //#define FREEIMUv035_BMP // FreeIMU v0.3.5_BMP
+//#define FREEIMUv04      // FreeIMU v0.4 with MPU6050, HMC5883L, MS561101BA                  <- confirmed by Alex
 //#define PIPO            // 9DOF board from erazz
 //#define QUADRINO        // full FC board 9DOF+baro board from witespy  with BMP085 baro     <- confirmed by Alex
 //#define QUADRINO_ZOOM   // full FC board 9DOF+baro board from witespy  second edition       <- confirmed by Alex
@@ -138,6 +143,18 @@
 //#define ITG3200_LPF_20HZ
 //#define ITG3200_LPF_10HZ      // Use this only in extreme cases, rather change motors and/or props
 
+/* MPU6050 Low pass filter setting. In case you cannot eliminate all vibrations to the Gyro, you can try
+   to decrease the LPF frequency, only one step per try. As soon as twitching gone, stick with that setting.
+   It will not help on feedback wobbles, so change only when copter is randomly twiching and all dampening and
+   balancing options ran out. Uncomment only one option!
+   IMPORTANT! Change low pass filter setting changes PID behaviour, so retune your PID's after changing LPF.*/
+//#define MPU6050_LPF_256HZ     // This is the default setting, no need to uncomment, just for reference
+//#define MPU6050_LPF_188HZ
+//#define MPU6050_LPF_98HZ
+//#define MPU6050_LPF_42HZ
+//#define MPU6050_LPF_20HZ
+//#define MPU6050_LPF_10HZ      // Use this only in extreme cases, rather change motors and/or props
+
 /* The following lines apply only for specific receiver with only one PPM sum signal, on digital PIN 2
    IF YOUR RECEIVER IS NOT CONCERNED, DON'T UNCOMMENT ANYTHING. Note this is mandatory for a Y6 setup on a promini
    Select the right line depending on your radio brand. Feel free to modify the order in your PPM order is different */
@@ -152,7 +169,7 @@
      There is no 3.3V source on a pro mini; you can either use a different 3V source, or attach orange to 5V with a 3V regulator in-line (such as http://search.digikey.com/scripts/DkSearch/dksus.dll?Detail&name=MCP1700-3002E/TO-ND)
      If you use an inline-regulator, a standard 3-pin servo connector can connect to ground, +5V, and RX0; solder the correct wires (and the 3V regulator!) to a Spektrum baseRX-to-Sat cable that has been cut in half. 
      NOTE: Because there is only one serial port on the Pro Mini, using a Spektrum Satellite implies you CANNOT use the PC based configuration tool. Further, you cannot use on-aircraft serial LCD as the baud rates are incompatible. You can configure by one of two methods:
-       1) Coming soon: Use an on-aircraft Eagle Tree LCD for setting gains, reading sensors, etc. 
+       1) Use an on-aircraft i2c LCD (such as Eagle Tree or LCD03) for setting gains, reading sensors, etc. 
        2) Available now: Comment out the Spektrum definition, upload, plug in PC, configure; uncomment the Spektrum definition, upload, plug in RX, and fly.  Repeat as required to configure. 
    (Contribution by Danal) */
 //#define SPEKTRUM 1024
@@ -233,20 +250,49 @@
 /* In order to save space, it's possibile to desactivate the LCD configuration functions
    comment this line only if you don't plan to used a LCD */
 #define LCD_CONF
+/* to include setting the aux switches for AUX1 and AUX2 via LCD */
+//#define LCD_CONF_AUX_12
+/* to include setting the aux switches for AUX1, AUX2, AUX3 and AUX4 via LCD */
+//#define LCD_CONF_AUX_1234
+/* Use this to trigger LCD configuration without a TX - only for debugging - do NOT fly with this activated */
+//#define LCD_CONF_DEBUG
 
-/* To use an Eagle Tree Power Panel LCD for configuration, uncomment this line
+/* choice of LCD attached for configuration and telemetry, see notes below */
+#define LCD_SERIAL3W    // Alex' initial variant with 3 wires, using rx-pin for transmission @9600 baud fixed
+/* serial (wired or wireless via BT etc.) */
+//#define LCD_TEXTSTAR    // Cat's Whisker LCD_TEXTSTAR Module CW-LCD-02 (Which has 4 input keys for selecting menus)
+//#define LCD_VT100		  // vt100 compatible terminal emulation (blueterm, putty, etc.)
+/* i2c devices */
+//#define LCD_ETPP        // Eagle Tree Power Panel LCD, which is i2c (not serial)
+//#define LCD_LCD03       // LCD03, which is i2c
+
+/* keys to navigate the LCD menu (preset to LCD_TEXTSTAR key-depress codes)*/
+#define LCD_MENU_PREV 'a'
+#define LCD_MENU_NEXT 'c'
+#define LCD_VALUE_UP 'd'
+#define LCD_VALUE_DOWN 'b'
+
+/* To use an LCD03 for configuration:
+ http://www.robot-electronics.co.uk/htm/Lcd03tech.htm
+ Remove the jumper on its back to set i2c control.
+ VCC to +5V VCC (pin1 from top)
+ SDA - Pin A4 Mini Pro - Pin 20 Mega (pin2 from top)
+ SCL - Pin A5 Mini Pro - Pin 21 Mega (pin3 from top)
+ GND to Ground (pin4 from top)
+ (by Th0rsten) */
+
+/* To use an Eagle Tree Power Panel LCD for configuration:
  White wire  to Ground
  Red wire    to +5V VCC (or to the WMP power pin, if you prefer to reset everything on the bus when WMP resets)
  Yellow wire to SDA - Pin A4 Mini Pro - Pin 20 Mega
  Brown wire  to SCL - Pin A5 Mini Pro - Pin 21 Mega 
  (Contribution by Danal) */
-//#define LCD_ETPP
 
-/* to use Cat's whisker TEXTSTAR LCD, uncomment following line.
+/* Cat's whisker LCD_TEXTSTAR LCD
    Pleae note this display needs a full 4 wire connection to (+5V, Gnd, RXD, TXD )
    Configure display as follows: 115K baud, and TTL levels for RXD and TXD, terminal mode
    NO rx / tx line reconfiguration, use natural pins */
-//#define LCD_TEXTSTAR
+
 
 /* motors will not spin when the throttle command is in low position
    this is an alternative method to stop immediately the motors */
@@ -266,7 +312,7 @@
 /* you can change the tricopter servo travel here */
 #define TRI_YAW_CONSTRAINT_MIN 1020
 #define TRI_YAW_CONSTRAINT_MAX 2000
-#define TRI_YAW_MIDDLE 1500
+#define TRI_YAW_MIDDLE 1500 // tail servo center pos. - use this for initial trim; later trim midpoint via LCD
 
 /* Flying Wing: you can change change servo orientation and servo min/max values here */
 /* valid for all flight modes, even passThrough mode */
@@ -275,8 +321,8 @@
 #define PITCH_DIRECTION_R -1  // right servo - pitch orientation (opposite sign to PITCH_DIRECTION_L, if servos are mounted in mirrored orientation)
 #define ROLL_DIRECTION_L 1 // left servo - roll orientation
 #define ROLL_DIRECTION_R 1  // right servo - roll orientation  (same sign as ROLL_DIRECTION_L, if servos are mounted in mirrored orientation)
-#define WING_LEFT_MID  1500 // left servo center pos. - use this for trim
-#define WING_RIGHT_MID 1500 // right servo center pos. - use this for trim
+#define WING_LEFT_MID  1500 // left servo center pos. - use this for initial trim; later trim midpoint via LCD
+#define WING_RIGHT_MID 1500 // right servo center pos. - use this for initial trim; later trim midpoint via LCD
 #define WING_LEFT_MIN  1020 // limit servo travel range must be inside [1020;2000]
 #define WING_LEFT_MAX  2000 // limit servo travel range must be inside [1020;2000]
 #define WING_RIGHT_MIN 1020 // limit servo travel range must be inside [1020;2000]
@@ -287,7 +333,7 @@
 /* Two options: */
 /* 1 - soft: - (good results +-5% for plush and mystery ESCs @ 2S and 3S, not good with SuperSimple ESC */
 /*      00. relies on your combo of battery type (Voltage, cpacity), ESC, ESC settings, motors, props and multiwii cycle time */
-/*      01. set POWERMETER soft. Uses PLEVELSCALE = 50, PLEVELDIV = PLEVELDIVSOFT = 10000 */
+/*      01. set POWERMETER soft. Uses PLEVELSCALE = 50, PLEVELDIV = PLEVELDIVSOFT = 5000 */
 /*      0. output is a value that linearily scales to power (mAh) */
 /*      1. get voltage reading right first */
 /*      2. start with freshly charged battery */
@@ -302,42 +348,49 @@
 /*      00. uses analog pin 2 to read voltage output from sensor. */
 /*      01. set POWERMETER hard. Uses PLEVELSCALE = 50 */
 /*      02. install low path filter for 25 Hz to sensor input */
+/*      03. check your average cycle time. If not close to 3ms, then you must change PLEVELDIV accordingly */
 /*      1. compute PLEVELDIV for your sensor (see below for insturctions) */
-/*      2. set PLEVELDIVSOFT to 10000 ( to use LOG_VALUES for individual motor comparison) */
+/*      2. set PLEVELDIVSOFT to 5000 ( to use LOG_VALUES for individual motor comparison) */
 /*      3. attach, set PSENSORNULL and  PINT2mA */
 /*      4. configure, compile, upload, set alarm value in GUI or LCD */
 /*      3. enjoy true readings of mAh consumed */
 /* set POWERMETER to "soft" (1) or "hard" (2) depending on sensor you want to utilize */
-//#define POWERMETER 1
-//#define POWERMETER 2
+//#define POWERMETER_SOFT
+//#define POWERMETER_HARD
 /* the sum of all powermeters ranges from [0:60000 e4] theoretically. */
 /* the alarm level from eeprom is out of [0:255], so we multipy alarm level with PLEVELSCALE and with 1e4 before comparing */
 /* PLEVELSCALE is the step size you can use to set alarm */
 #define PLEVELSCALE 50 // if you change this value for other granularity, you must search for comments in code to change accordingly 
 /* larger PLEVELDIV will get you smaller value for power (mAh equivalent) */
-#define PLEVELDIV 10000 // default for soft - if you lower PLEVELDIV, beware of overrun in uint32 pMeter
-#define PLEVELDIVSOFT PLEVELDIV // for soft always equal to PLEVELDIV; for hard set to 10000
+#define PLEVELDIV 5000 // default for soft - if you lower PLEVELDIV, beware of overrun in uint32 pMeter
+#define PLEVELDIVSOFT PLEVELDIV // for soft always equal to PLEVELDIV; for hard set to 5000
 //#define PLEVELDIV 1361L // to convert the sum into mAh divide by this value
 /* amploc 25A sensor has 37mV/A */
 /* arduino analog resolution is 4.9mV per unit; units from [0..1023] */
 /* sampling rate 20ms, approx 19977 micro seconds */
-/* PLEVELDIV = 37 / 4.9  * 10e6 / 19977  * 3600 / 1000  = 1361L */
+/* PLEVELDIV = 37 / 4.9  * 10e6 / 18000  * 3600 / 1000  = 1361L */
 /* set to analogRead() value for zero current */
 #define PSENSORNULL 510 // for I=0A my sensor gives 1/2 Vss; that is approx 2.49Volt
 #define PINT2mA 13 // for telemtry display: one integer step on arduino analog translates to mA (example 4.9 / 37 * 100
+
+
 
 /* to monitor system values (battery level, loop time etc. with LCD enable this */
 /* note: for now you must send single characters 'A', 'B', 'C', 'D' to request 4 different pages */
 /* Buttons toggle request for page on/off */
 /* The active page on the LCD does get updated automatically */
-/* Easy to use with Terminal application or Textstar LCD - the 4 buttons are preconfigured to send 'A', 'B', 'C', 'D' */
-/* The value represents the refresh interval in cpu time (micro seconds) */
-//#define LCD_TELEMETRY 100011
-/* to enable automatic hopping between 4 telemetry pages uncomment this. */
+/* Easy to use with Terminal application or display like LCD - uses the 4 buttons are preconfigured to send 'A', 'B', 'C', 'D' */
+//#define LCD_TELEMETRY
+/* to enable automatic hopping between a choice of telemetry pages uncomment this. */
 /* This may be useful if your LCD has no buttons or the sending is broken */
 /* hopping is activated and deactivated in unarmed mode with throttle=low & roll=left & pitch=forward */
-/* The value represents the hopping interval in cpu time (micro seconds) */
-//#define LCD_TELEMETRY_AUTO 2000123
+/* set it to the sequence of telemetry pages you want to see */
+//#define LCD_TELEMETRY_AUTO "12345267" // pages 1 to 7 in ascending order
+//#define LCD_TELEMETRY_AUTO  "2122324252627" // strong emphasis on page 2
+/* Use this to trigger telemetry without a TX - only for debugging - do NOT fly with this activated */
+//#define LCD_TELEMETRY_DEBUG  //This form rolls between all screens, LCD_TELEMETRY_AUTO must also be defined.
+//#define LCD_TELEMETRY_DEBUG 6  //This form stays on the screen specified.
+
 /* on telemetry page B it gives a bar graph which shows how much voltage battery has left. Range from 0 to 12 Volt is not very informative */
 /* so we try do define a meaningful part. For a 3S battery we define full=12,6V and calculate how much it is above first warning level */
 /* Example: 12.6V - VBATLEVEL1_3S  (for me = 126 - 102 = 24) */
@@ -345,8 +398,14 @@
 
 /* to log values like max loop time and others to come */
 /* logging values are visible via LCD config */
-//#define LOG_VALUES
- 
+/* set to 2, if you want powerconsumption on a per motor basis (this uses the big array and is a memory hog, if POWERMETER <> PM_SOFT) */
+//#define LOG_VALUES 1
+
+/* to add debugging code */
+/* not needed and not recommended for normal operation */
+/* will add extra code that may slow down the main loop or make copter non-flyable */
+//#define DEBUG
+
 //****** end of advanced users settings *************
 
 //if you want to change to orientation of individual sensor
@@ -354,6 +413,15 @@
 //#define GYRO_ORIENTATION(X, Y, Z) {gyroADC[ROLL] = -Y; gyroADC[PITCH] =  X; gyroADC[YAW] = Z;}
 //#define MAG_ORIENTATION(X, Y, Z)  {magADC[ROLL]  = X; magADC[PITCH]  = Y; magADC[YAW]  = Z;}
 
+ 
+/* frequenies for rare cyclic actions in the main loop, depend on cycle time! */
+/* time base is main loop cycle time - a value of 6 means to trigger the action every 6th run through the main loop */
+/* example: with cycle time of approx 3ms, do action every 6*3ms=18ms */
+/* value must be [1; 65535] */
+#define LCD_TELEMETRY_FREQ 23       // to send telemetry data over serial 23 <=> 60ms <=> 16Hz (only sending interlaced, so 8Hz update rate)
+#define LCD_TELEMETRY_AUTO_FREQ 667 // to step to next telemetry page 667 <=> 2s
+#define PSENSORFREQ 6               // to read hardware powermeter sensor 6 <=> 18ms
+#define VBATFREQ PSENSORFREQ        // to read battery voltage - keep equal to PSENSORFREQ unless you know what you are doing
 /**************************************/
 /****END OF CONFIGURABLE PARAMETERS****/
 /**************************************/

@@ -39,7 +39,7 @@
   #define PPM_PIN_INTERRUPT          attachInterrupt(0, rxInt, RISING); //PIN 0
   #define SPEK_SERIAL_VECT           USART_RX_vect
   #define SPEK_DATA_REG              UDR0
-  #define MOTOR_ORDER                9,10,11,3,6,5  //for a quad+: rear,right,left,front
+//  #define MOTOR_ORDER                9,10,11,3,6,5  //for a quad+: rear,right,left,front
   #define DIGITAL_CAM_PINMODE        pinMode(A2,OUTPUT);
   #define DIGITAL_CAM_HIGH           PORTC |= 1<<2;
   #define DIGITAL_CAM_LOW            PORTC &= ~(1<<2);
@@ -55,6 +55,50 @@
   #define ISR_UART                   ISR(USART_UDRE_vect)
   #define V_BATPIN                   A3    // Analog PIN 3
   #define PSENSORPIN                 A2    // Analog PIN 2
+
+  //motor order changes because of possible octo
+  #define MOTOR_ORDER       9,10,11,3,6,5,A2,12  //for a quad+: rear,right,left,front
+  
+  // TILT_PITCH
+  #define SERVO_1_PINMODE   pinMode(A0,OUTPUT);
+  #define SERVO_1_PIN_HIGH  PORTC |= 1<<0;
+  #define SERVO_1_PIN_LOW   PORTC &= ~(1<<0);
+  
+  // TILT_ROLL
+  #define SERVO_2_PINMODE   pinMode(A1,OUTPUT);
+  #define SERVO_2_PIN_HIGH  PORTC |= 1<<1;
+  #define SERVO_2_PIN_LOW   PORTC &= ~(1<<1);
+  
+  // CAM TRIG
+  #define SERVO_3_PINMODE   pinMode(A2,OUTPUT);
+  #define SERVO_3_PIN_HIGH  PORTC |= 1<<2;
+  #define SERVO_3_PIN_LOW   PORTC &= ~(1<<2);
+  
+  // new
+  #define SERVO_4_PINMODE   pinMode(12,OUTPUT);
+  #define SERVO_4_PIN_HIGH  PORTB |= 1<<4;
+  #define SERVO_4_PIN_LOW   PORTB &= ~(1<<4);
+  
+  // BI LEFT
+  #define SERVO_5_PINMODE   pinMode(3,OUTPUT);
+  #define SERVO_5_PIN_HIGH  PORTD|= 1<<3;
+  #define SERVO_5_PIN_LOW   PORTD &= ~(1<<3);
+  
+  // TRI REAR
+  #define SERVO_6_PINMODE   pinMode(11,OUTPUT);
+  #define SERVO_6_PIN_HIGH  PORTB |= 1<<3;
+  #define SERVO_6_PIN_LOW   PORTB &= ~(1<<3);
+  
+  // new motor pin 10
+  #define SERVO_7_PINMODE   pinMode(10,OUTPUT);
+  #define SERVO_7_PIN_HIGH  PORTB |= 1<<2;
+  #define SERVO_7_PIN_LOW   PORTB &= ~(1<<2);
+  
+  //new motor pin 9
+  #define SERVO_8_PINMODE   pinMode(9,OUTPUT);
+  #define SERVO_8_PIN_HIGH  PORTB |= 1<<1;
+  #define SERVO_8_PIN_LOW   PORTB &= ~(1<<1);
+
 #endif
 #if defined(MEGA)
   #define LEDPIN_PINMODE             pinMode (13, OUTPUT);pinMode (30, OUTPUT);
@@ -90,7 +134,6 @@
   #define PPM_PIN_INTERRUPT          attachInterrupt(4, rxInt, RISING);  //PIN 19, also used for Spektrum satellite option
   #define SPEK_SERIAL_VECT           USART1_RX_vect
   #define SPEK_DATA_REG              UDR1
-  #define MOTOR_ORDER                3,5,6,2,7,8,9,10   //for a quad+: rear,right,left,front   //+ for y6: 7:under right  8:under left
   #define DIGITAL_CAM_PINMODE        pinMode(33,OUTPUT); pinMode(46,OUTPUT); // 33 + 46
   #define DIGITAL_CAM_HIGH           PORTC |= 1<<4;PORTL |= 1<<3;
   #define DIGITAL_CAM_LOW            PORTC &= ~(1<<4);PORTL &= ~(1<<3);
@@ -104,8 +147,50 @@
   #define AUX3PIN                    6  //PIN 68 =  PIN A14
   #define AUX4PIN                    7  //PIN 69 =  PIN A15
   #define ISR_UART                   ISR(USART0_UDRE_vect)
-  #define V_BATPIN                   A0    // Analog PIN 3
+  #define V_BATPIN                   A0    // Analog PIN 0
   #define PSENSORPIN                 A2    // Analog PIN 2
+
+  #define MOTOR_ORDER                3,5,6,2,7,8,9,10   //for a quad+: rear,right,left,front   //+ for y6: 7:under right  8:under left
+  
+  // TILT_PITCH
+  #define SERVO_1_PINMODE   pinMode(34,OUTPUT);pinMode(44,OUTPUT);
+  #define SERVO_1_PIN_HIGH  PORTC |= 1<<3;PORTL |= 1<<5;
+  #define SERVO_1_PIN_LOW   PORTC &= ~(1<<3);PORTL &= ~(1<<5);
+  
+  // TILT_ROLL
+  #define SERVO_2_PINMODE   pinMode(35,OUTPUT);pinMode(45,OUTPUT);
+  #define SERVO_2_PIN_HIGH  PORTC |= 1<<2;PORTL |= 1<<4;
+  #define SERVO_2_PIN_LOW   PORTC &= ~(1<<2);PORTL &= ~(1<<4);
+  
+  // CAM TRIG
+  #define SERVO_3_PINMODE   pinMode(33,OUTPUT); pinMode(46,OUTPUT);
+  #define SERVO_3_PIN_HIGH  PORTC |= 1<<4;PORTL |= 1<<3;
+  #define SERVO_3_PIN_LOW   PORTC &= ~(1<<4);PORTL &= ~(1<<3);
+  
+  // new ?
+  #define SERVO_4_PINMODE   pinMode (37, OUTPUT);
+  #define SERVO_4_PIN_HIGH  PORTC |= 1<<0;
+  #define SERVO_4_PIN_LOW   PORTC &= ~(1<<0);
+  
+  // BI LEFT
+  #define SERVO_5_PINMODE   pinMode(6,OUTPUT);
+  #define SERVO_5_PIN_HIGH  PORTH |= 1<<3;
+  #define SERVO_5_PIN_LOW   PORTH &= ~(1<<3);
+  
+  // TRI REAR
+  #define SERVO_6_PINMODE   pinMode(2,OUTPUT);
+  #define SERVO_6_PIN_HIGH  PORTE |= 1<<4;
+  #define SERVO_6_PIN_LOW   PORTE &= ~(1<<4);
+  
+  //new motor pin 5 
+  #define SERVO_7_PINMODE   pinMode(5,OUTPUT);
+  #define SERVO_7_PIN_HIGH  PORTE |= 1<<3;
+  #define SERVO_7_PIN_LOW   PORTE &= ~(1<<3);
+  
+  //new motor pin 3 
+  #define SERVO_8_PINMODE   pinMode(3,OUTPUT);
+  #define SERVO_8_PIN_HIGH  PORTE |= 1<<5;
+  #define SERVO_8_PIN_LOW   PORTE &= ~(1<<5);
 #endif
 
 
@@ -169,6 +254,17 @@
   #elif defined(FREEIMUv035_BMP)
     #define BMP085
   #endif
+#endif
+
+#if defined(FREEIMUv04)
+  #define MPU6050
+  #define HMC5883
+  #define MS561101BA
+  #define ACC_ORIENTATION(X, Y, Z)  {accADC[ROLL]  =  X; accADC[PITCH]  = Y; accADC[YAW]  = Z;}
+  #define GYRO_ORIENTATION(X, Y, Z) {gyroADC[ROLL] =  X;  gyroADC[PITCH] = Y; gyroADC[YAW] = Z;}
+  #define MAG_ORIENTATION(X, Y, Z)  {magADC[ROLL]  =  -Y;  magADC[PITCH]  = X; magADC[YAW]  = Z;}
+  #define MPU6050_EN_I2C_BYPASS // MAG connected to the AUX I2C bus of MPU6050
+  #undef INTERNAL_I2C_PULLUPS
 #endif
 
 #if defined(PIPO)
@@ -290,7 +386,7 @@
   #define ITG3200_ADDRESS 0XD2
 #endif
 
-#if defined(ADXL345) || defined(BMA020) || defined(BMA180) || defined(NUNCHACK) || defined(ADCACC) || defined(LSM303DLx_ACC)
+#if defined(ADXL345) || defined(BMA020) || defined(BMA180) || defined(NUNCHACK) || defined(ADCACC) || defined(LSM303DLx_ACC) || defined(MPU6050)
   #define ACC 1
 #else
   #define ACC 0
@@ -302,7 +398,7 @@
   #define MAG 0
 #endif
 
-#if defined(ITG3200) || defined(L3G4200D)
+#if defined(ITG3200) || defined(L3G4200D) || defined(MPU6050)
   #define GYRO 1
 #else
   #define GYRO 0
@@ -335,17 +431,6 @@
 #endif
 
 
-#if defined(POWERMETER)
-  #ifndef VBAT
-	#error "to use powermeter, you must also define and configure VBAT"
-  #endif
-#endif
-#ifdef LCD_TELEMETRY_AUTO
-  #ifndef LCD_TELEMETRY
-     #error "to use automatic telemetry, you MUST also define and configure LCD_TELEMETRY"
-  #endif
-#endif
-
 #if defined(TRI)
   #define MULTITYPE 1
 #elif defined(QUADP)
@@ -373,3 +458,27 @@
 #elif defined(OCTOFLATX)
   #define MULTITYPE 11      //the GUI is the same for all 8 motor configs
 #endif
+
+#if defined(POWERMETER_HARD) || defined(POWERMETER_SOFT)
+  #define POWERMETER
+#endif
+
+/**************************/
+/* Error Checking Section */
+/**************************/
+
+#if (defined(LCD_CONF) || defined(LCD_TELEMETRY)) && !(defined(LCD_SERIAL3W) || defined(LCD_TEXTSTAR) || defined(LCD_VT100) || defined(LCD_ETPP) || defined(LCD_LCD03))
+  #error "LCD_CONF or LCD_TELEMETRY defined, and choice of LCD not defined.  Uncomment one of LCD_SERIAL3W or LCD_TEXTSTAR or LCD_VT100 or LCD_ETPP or LCD_LCD03"
+#endif
+
+
+#if defined(POWERMETER) && !(defined(VBAT))
+  	#error "to use powermeter, you must also define and configure VBAT"
+#endif
+
+#if defined(LCD_TELEMETRY_AUTO) && !(defined(LCD_TELEMETRY))
+ 	#error "to use automatic telemetry, you MUST also define and configure LCD_TELEMETRY"
+#endif
+
+
+
