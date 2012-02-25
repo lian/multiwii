@@ -13,8 +13,8 @@
 //#define GIMBAL
 //#define BI
 //#define TRI
-//#define QUADP
-#define QUADX
+#define QUADP
+//#define QUADX
 //#define Y4
 //#define Y6
 //#define HEX6
@@ -143,7 +143,7 @@
 /* I2C accelerometer */
 //#define MMA745
 //#define ADXL345
-//#define BMA020
+#define BMA020
 //#define BMA180
 //#define NUNCHACK  // if you want to use the nunckuk as a standalone I2C ACC without WMP
 //#define LIS3LV02
