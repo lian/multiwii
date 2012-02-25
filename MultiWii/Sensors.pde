@@ -13,6 +13,10 @@
 #endif
 
 /*** I2C address ***/
+#if !defined(MMA7455_ADDRESS)
+  #define MMA7455_ADDRESS 0x3A
+#endif
+
 #if !defined(ADXL345_ADDRESS) 
   #define ADXL345_ADDRESS 0x3A
   //#define ADXL345_ADDRESS 0xA6   //WARNING: Conflicts with a Wii Motion plus!
@@ -35,7 +39,7 @@
 
 #if !defined(MS561101BA_ADDRESS) 
   #define MS561101BA_ADDRESS 0xEE //CBR=0 0xEE I2C address when pin CSB is connected to LOW (GND)
-  //#define MS561101BA_ADDRESS 0xEF //CBR=1 0xEF I2C address when pin CSB is connected to HIGH (VCC)
+  //#define MS561101BA_ADDRESS 0xEC //CBR=1 0xEC I2C address when pin CSB is connected to HIGH (VCC)
 #endif
 
 //ITG3200 and ITG3205 Gyro LPF setting
@@ -272,6 +276,7 @@ void ACC_Common() {
         }
         //all values are measured
         if (InflightcalibratingA == 1) {
+          AccInflightCalibrationActive = 0;
           AccInflightCalibrationMeasurementDone = 1;
           blinkLED(10,10,2);      //buzzer for indicatiing the start inflight
         // recover saved values to maintain current flight behavior until new values are transferred
@@ -323,7 +328,7 @@ static struct {
   uint8_t  state;
   uint32_t deadline;
 } bmp085_ctx;  
-#define OSS 3
+#define OSS 2 //we can get more uique samples and get better precision using average
 
 void i2c_BMP085_readCalibration(){
   delay(10);
@@ -434,13 +439,13 @@ void Baro_update() {
       break;
     case 2: 
       i2c_BMP085_UP_Start(); 
-      bmp085_ctx.state++; bmp085_ctx.deadline += 26000; 
+      bmp085_ctx.state++; bmp085_ctx.deadline += 14000; 
       break;
     case 3: 
       i2c_BMP085_UP_Read(); 
       i2c_BMP085_Calculate(); 
-      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 443300.0f; //decimeter
-      bmp085_ctx.state = 0; bmp085_ctx.deadline += 20000; 
+      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f; //centimeter
+      bmp085_ctx.state = 0; bmp085_ctx.deadline += 5000; 
       break;
   } 
 }
@@ -539,10 +544,29 @@ void i2c_MS561101BA_UT_Read() {
 }
 
 void i2c_MS561101BA_Calculate() {
+  int64_t off2=0,sens2=0,temperature=0,t2=0;
   int64_t dT   = ms561101ba_ctx.ut.val - ((uint32_t)ms561101ba_ctx.c[5] << 8);  //int32_t according to the spec, but int64_t here to avoid cast after
   int64_t off  = ((uint32_t)ms561101ba_ctx.c[2] <<16) + ((dT * ms561101ba_ctx.c[4]) >> 7);
   int64_t sens = ((uint32_t)ms561101ba_ctx.c[1] <<15) + ((dT * ms561101ba_ctx.c[3]) >> 8);
   pressure     = (( (ms561101ba_ctx.up.val * sens ) >> 21) - off) >> 15;
+  temperature = (2000 + dT * (uint32_t)ms561101ba_ctx.c[5] / pow(2, 23)); 
+  if (temperature < 2000) 
+  { 
+    // temperature lower than 20st.C 
+    t2 = (dT*dT)/pow(2,31); 
+    off2 = 5 * (((int32_t)temperature-2000)*((int32_t)temperature-2000))/2; 
+    sens2 = 5 * (((int32_t)temperature-2000)*((int32_t)temperature-2000))/4; 
+    if (temperature < -1500) 
+    { 
+      // temperature lower than -15st.C 
+      off2 = off2 + 7 * (((int32_t)temperature+1500)*((int32_t)temperature+1500)); 
+      sens2 = sens2 + 11 * (((int32_t)temperature+1500)*((int32_t)temperature+1500))/2; 
+    } 
+  } 
+  temperature = temperature - t2; 
+  off = off - off2; 
+  sens = sens - sens2; 
+  pressure     = (( (ms561101ba_ctx.up.val * sens ) / pow(2,21)) - off) / pow(2,15);
 }
 
 void Baro_update() {
@@ -552,7 +576,7 @@ void Baro_update() {
   switch (ms561101ba_ctx.state) {
     case 0: 
       i2c_MS561101BA_UT_Start(); 
-      ms561101ba_ctx.state++; ms561101ba_ctx.deadline += 15000; //according to the specs, the pause should be at least 8.22ms
+      ms561101ba_ctx.state++; ms561101ba_ctx.deadline += 10000; //according to the specs, the pause should be at least 8.22ms
       break;
     case 1: 
       i2c_MS561101BA_UT_Read(); 
@@ -560,18 +584,38 @@ void Baro_update() {
       break;
     case 2: 
       i2c_MS561101BA_UP_Start(); 
-      ms561101ba_ctx.state++; ms561101ba_ctx.deadline += 15000; //according to the specs, the pause should be at least 8.22ms
+      ms561101ba_ctx.state++; ms561101ba_ctx.deadline += 10000; //according to the specs, the pause should be at least 8.22ms
       break;
     case 3: 
       i2c_MS561101BA_UP_Read();
       i2c_MS561101BA_Calculate();
-      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 443300.0f; //decimeter
-      ms561101ba_ctx.state = 0; ms561101ba_ctx.deadline += 35000;
+      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f; //centimeter
+      ms561101ba_ctx.state = 0; ms561101ba_ctx.deadline += 4000;
       break;
   } 
 }
 #endif
 
+// ************************************************************************************************************
+// I2C Accelerometer MMA7455 
+// ************************************************************************************************************
+#if defined(MMA7455)
+void ACC_init () {
+  delay(10);
+  i2c_writeReg(MMA7455_ADDRESS,0x16,0x21);
+  acc_1G = 64;
+}
+
+void ACC_getADC () {
+  TWBR = ((16000000L / 400000L) - 16) / 2;
+  i2c_getSixRawADC(MMA7455_ADDRESS,0x00);
+
+  ACC_ORIENTATION(   ((int8_t(rawADC[3])<<8) | int8_t(rawADC[2])) ,
+                    -((int8_t(rawADC[1])<<8) | int8_t(rawADC[0])) ,
+                     ((int8_t(rawADC[5])<<8) | int8_t(rawADC[4])) );
+  ACC_Common();
+}
+#endif
 
 // ************************************************************************************************************
 // I2C Accelerometer ADXL345 
@@ -918,9 +962,9 @@ void Mag_getADC() {
     delay(100);
       getADC();
     delay(10);
-    magCal[ROLL]  =   1000.0 / magADC[ROLL];
-    magCal[PITCH] =   1000.0 / magADC[PITCH];
-    magCal[YAW]   = - 1000.0 / magADC[YAW];
+    magCal[ROLL]  =  1000.0 / abs(magADC[ROLL]);
+    magCal[PITCH] =  1000.0 / abs(magADC[PITCH]);
+    magCal[YAW]   =  1000.0 / abs(magADC[YAW]);
 
     // leave test mode
     i2c_writeReg(MAG_ADDRESS ,0x00 ,0x70 ); //Configuration Register A  -- 0 11 100 00  num samples: 8 ; output rate: 15Hz ; normal measurement mode

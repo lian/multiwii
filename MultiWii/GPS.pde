@@ -1,3 +1,4 @@
+#if GPS
 /* this is an equirectangular approximation to calculate distance and bearing between 2 GPS points (lat/long)
    it's much more faster than an exact calculation
    the error is neglectible for few kilometers assuming a constant R for earth
@@ -33,7 +34,8 @@ uint32_t GPS_coord_to_degrees(char* s) {
     if (*p == '.') d=p;
   }
   m=10000;
-  min = *--d-'0' + (*--d-'0')*10;
+  min = *--d-'0';
+  min += (*--d-'0')*10;
   sec = (m*min+dec)/6;
   while (d != s) { m*=10; *--d-='0'; sec+=*d*m; }
   return sec ;
@@ -85,3 +87,4 @@ bool GPS_newFrame(char c) {
   }
   return frameOK && GPGGA_frame;
 }
+#endif
