@@ -1,7 +1,7 @@
 /*
 MultiWiiCopter by Alexandre Dubus
 www.multiwii.com
-November  2011     V1.9
+December  2011     V1.dev
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
@@ -19,13 +19,14 @@ November  2011     V1.9
 #define THROTTLE   3
 #define AUX1       4
 #define AUX2       5
-#define CAMPITCH   6
-#define CAMROLL    7
+#define AUX3       6
+#define AUX4       7
 
 #define PIDALT     3
 #define PIDVEL     4
-#define PIDLEVEL   5
-#define PIDMAG     6
+#define PIDGPS     5
+#define PIDLEVEL   6
+#define PIDMAG     7
 
 #define BOXACC      0
 #define BOXBARO     1
@@ -35,6 +36,11 @@ November  2011     V1.9
 #define BOXARM      5
 #define BOXGPSHOME  6
 #define BOXGPSHOLD  7
+#define PASSTHRU    8
+#define BOXHEADFREE 9
+
+#define CHECKBOXITEMS 10
+#define PIDITEMS 8
 
 static uint32_t currentTime = 0;
 static uint16_t previousTime = 0;
@@ -51,6 +57,8 @@ static uint8_t  magMode = 0;        // if compass heading hold is a activated
 static uint8_t  baroMode = 0;       // if altitude hold is activated
 static uint8_t  GPSModeHome = 0;    // if GPS RTH is activated
 static uint8_t  GPSModeHold = 0;    // if GPS PH is activated
+static uint8_t  headFreeMode = 0;   // if head free mode is a activated
+static int16_t  headFreeModeHold;
 static int16_t  gyroADC[3],accADC[3],magADC[3];
 static int16_t  accSmooth[3];       // projection of smoothed and normalized gravitation force vector on x/y/z axis, as measured by accelerometer
 static int16_t  accTrim[2] = {0, 0};
@@ -58,7 +66,7 @@ static int16_t  heading,magHold;
 static uint8_t  calibratedACC = 0;
 static uint8_t  vbat;               // battery voltage in 0.1V steps
 static uint8_t  okToArm = 0;
-static uint8_t  rcOptions;
+static uint8_t  rcOptions1,rcOptions2;
 static int32_t  pressure;
 static int32_t  BaroAlt;
 static int32_t  EstVelocity;
@@ -80,6 +88,7 @@ static uint32_t pMeter[PMOTOR_SUM + 1];  //we use [0:7] for eight motors,one ext
 static uint8_t pMeterV;                  // dummy to satisfy the paramStruct logic in ConfigurationLoop()
 static uint32_t pAlarm;                  // we scale the eeprom value from [0:255] to this value we can directly compare to the sum in pMeter[6]
 static uint8_t powerTrigger1 = 0;       // trigger for alarm based on power consumption
+static uint16_t intPowerMeterSum, intPowerTrigger1;
 
 // **********************
 // telemetry
@@ -122,12 +131,25 @@ static int16_t servo[4] = {1500,1500,1500,1500};
 // **********************
 // EEPROM & LCD functions
 // **********************
-static uint8_t P8[7], I8[7], D8[7]; //8 bits is much faster and the code is much shorter
+static uint8_t P8[8], I8[9], D8[8]; //8 bits is much faster and the code is much shorter
 static uint8_t dynP8[3], dynI8[3], dynD8[3];
 static uint8_t rollPitchRate;
 static uint8_t yawRate;
 static uint8_t dynThrPID;
-static uint8_t activate[8];
+static uint8_t activate1[CHECKBOXITEMS];
+static uint8_t activate2[CHECKBOXITEMS];
+
+// **********************
+// GPS
+// **********************
+static int32_t  GPS_latitude,GPS_longitude;
+static int32_t  GPS_latitude_home,GPS_longitude_home;
+static uint8_t  GPS_fix , GPS_fix_home = 0;
+static uint8_t  GPS_numSat;
+static uint16_t GPS_distanceToHome;      // in meters
+static int16_t  GPS_directionToHome = 0; // in degrees
+static uint8_t  GPS_update = 0;          // it's a binary toogle to distinct a GPS position update
+static int16_t  GPS_angle[2];            // it's the angles that must be applied for GPS correction
 
 void blinkLED(uint8_t num, uint8_t wait,uint8_t repeat) {
   uint8_t i,r;
@@ -141,17 +163,6 @@ void blinkLED(uint8_t num, uint8_t wait,uint8_t repeat) {
     delay(60);
   }
 }
-
-// **********************
-// GPS
-// **********************
-static int32_t  GPS_latitude,GPS_longitude;
-static int32_t  GPS_latitude_home,GPS_longitude_home;
-static uint8_t  GPS_fix , GPS_fix_home = 0;
-static uint8_t  GPS_numSat;
-static uint16_t GPS_distanceToHome;
-static int16_t  GPS_directionToHome = 0;
-static uint8_t  GPS_update = 0;
 
 void annexCode() { //this code is excetuted at each loop and won't interfere with control loop if it lasts less than 650 microseconds
   static uint32_t buzzerTime,calibratedAccTime,telemetryTime,telemetryAutoTime,psensorTime;
@@ -184,6 +195,15 @@ void annexCode() { //this code is excetuted at each loop and won't interfere wit
     if (rcData[axis]<MIDRC) rcCommand[axis] = -rcCommand[axis];
   }
   rcCommand[THROTTLE] = MINTHROTTLE + (int32_t)(MAXTHROTTLE-MINTHROTTLE)* (rcData[THROTTLE]-MINCHECK)/(2000-MINCHECK);
+
+  if(headFreeMode) {
+    float radDiff = (heading - headFreeModeHold) * 0.0174533f; // where PI/180 ~= 0.0174533
+    float cosDiff = cos(radDiff);
+    float sinDiff = sin(radDiff);
+    int16_t rcCommand_PITCH = rcCommand[PITCH]*cosDiff + rcCommand[ROLL]*sinDiff;
+    rcCommand[ROLL] =  rcCommand[ROLL]*cosDiff - rcCommand[PITCH]*sinDiff; 
+    rcCommand[PITCH] = rcCommand_PITCH;
+  }
 
   #if (POWERMETER == 2)
   if (micros() > psensorTime + 19977 /*20000*/) { // 50Hz, but avoid bulking of timed tasks
@@ -242,6 +262,13 @@ void annexCode() { //this code is excetuted at each loop and won't interfere wit
     if (armed) {LEDPIN_ON;}
   }
 
+  #if defined(LED_RING)
+    static uint32_t LEDTime;
+    if ( currentTime > LEDTime ) {
+      LEDTime = currentTime + 50000;
+      i2CLedRingState();
+    }
+  #endif
 
   if ( currentTime > calibratedAccTime ) {
     if (smallAngle25 == 0) {
@@ -253,6 +280,11 @@ void annexCode() { //this code is excetuted at each loop and won't interfere wit
   }
 
   serialCom();
+
+  #if defined(POWERMETER)
+    intPowerMeterSum = (pMeter[PMOTOR_SUM]/PLEVELDIV);
+    intPowerTrigger1 = powerTrigger1 * PLEVELSCALE; 
+  #endif
 
   #ifdef LCD_TELEMETRY_AUTO
     if ( (telemetry_auto) && (micros() > telemetryAutoTime + LCD_TELEMETRY_AUTO) ) { // every 2 seconds
@@ -268,11 +300,19 @@ void annexCode() { //this code is excetuted at each loop and won't interfere wit
       telemetryTime = micros();  
     }
   #endif
+  
+  #if defined(GPS)
+    static uint32_t GPSLEDTime;
+    if ( currentTime > GPSLEDTime && (GPS_fix_home == 1)) {
+      GPSLEDTime = currentTime + 150000;
+      LEDPIN_TOGGLE;
+    }
+  #endif
 }
 
 
 void setup() {
-  Serial.begin(SERIAL_COM_SPEED);
+  SerialOpen(0,115200);
   LEDPIN_PINMODE;
   POWERPIN_PINMODE;
   BUZZERPIN_PINMODE;
@@ -293,7 +333,7 @@ void setup() {
       pMeter[i]=0;
   #endif
   #if defined(GPS)
-    GPS_SERIAL.begin(GPS_BAUD);
+    SerialOpen(GPS_SERIAL,GPS_BAUD);
   #endif
   #if defined(LCD_ETPP)
     i2c_ETPP_init();
@@ -359,14 +399,19 @@ void loop () {
           #endif
           previousTime = micros();
         }
-      } else if (activate[BOXARM] > 0) {
-        if ((rcOptions & activate[BOXARM]) && okToArm ) armed = 1;
-        else if (armed) armed = 0;
+      } else if ((activate1[BOXARM] > 0) || (activate2[BOXARM] > 0)) {
+        if ( ((rcOptions1 & activate1[BOXARM]) || (rcOptions2 & activate2[BOXARM])) && okToArm ) {
+          armed = 1;
+          headFreeModeHold = heading;
+        } else if (armed) armed = 0;
         rcDelayCommand = 0;
       } else if ( (rcData[YAW] < MINCHECK || rcData[ROLL] < MINCHECK)  && armed == 1) {
         if (rcDelayCommand == 20) armed = 0; // rcDelayCommand = 20 => 20x20ms = 0.4s = time to wait for a specific RC command to be acknowledged
       } else if ( (rcData[YAW] > MAXCHECK || rcData[ROLL] > MAXCHECK) && rcData[PITCH] < MAXCHECK && armed == 0 && calibratingG == 0 && calibratedACC == 1) {
-        if (rcDelayCommand == 20) armed = 1;
+        if (rcDelayCommand == 20) {
+          armed = 1;
+          headFreeModeHold = heading;
+        }
      #ifdef LCD_TELEMETRY_AUTO
       } else if (rcData[ROLL] < MINCHECK && rcData[PITCH] > MAXCHECK && armed == 0) {
         if (rcDelayCommand == 20) {
@@ -385,12 +430,24 @@ void loop () {
         rcDelayCommand++;
       } else if (rcData[PITCH] > MAXCHECK) {
          accTrim[PITCH]+=2;writeParams();
+         #if defined(LED_RING)
+           blinkLedRing();
+         #endif
       } else if (rcData[PITCH] < MINCHECK) {
          accTrim[PITCH]-=2;writeParams();
+         #if defined(LED_RING)
+           blinkLedRing();
+         #endif
       } else if (rcData[ROLL] > MAXCHECK) {
          accTrim[ROLL]+=2;writeParams();
+         #if defined(LED_RING)
+           blinkLedRing();
+         #endif
       } else if (rcData[ROLL] < MINCHECK) {
          accTrim[ROLL]-=2;writeParams();
+         #if defined(LED_RING)
+           blinkLedRing();
+         #endif
       } else {
         rcDelayCommand = 0;
       }
@@ -402,11 +459,13 @@ void loop () {
     }
    #endif
 
-    rcOptions = (rcData[AUX1]<1300)   + (1300<rcData[AUX1] && rcData[AUX1]<1700)*2  + (rcData[AUX1]>1700)*4
+    rcOptions1 = (rcData[AUX1]<1300)   + (1300<rcData[AUX1] && rcData[AUX1]<1700)*2  + (rcData[AUX1]>1700)*4
                +(rcData[AUX2]<1300)*8 + (1300<rcData[AUX2] && rcData[AUX2]<1700)*16 + (rcData[AUX2]>1700)*32;
+    rcOptions2 = (rcData[AUX3]<1300)   + (1300<rcData[AUX3] && rcData[AUX3]<1700)*2  + (rcData[AUX3]>1700)*4
+               +(rcData[AUX4]<1300)*8 + (1300<rcData[AUX4] && rcData[AUX4]<1700)*16 + (rcData[AUX4]>1700)*32;
     
     //note: if FAILSAFE is disable, failsafeCnt > 5*FAILSAVE_DELAY is always false
-    if (((rcOptions & activate[BOXACC]) || (failsafeCnt > 5*FAILSAVE_DELAY) ) && (ACC || nunchuk)) { 
+    if (( (rcOptions1 & activate1[BOXACC]) || (rcOptions2 & activate2[BOXACC]) || (failsafeCnt > 5*FAILSAVE_DELAY) ) && (ACC || nunchuk)) { 
       // bumpless transfer to Level mode
       if (!accMode) {
         errorAngleI[ROLL] = 0; errorAngleI[PITCH] = 0;
@@ -414,11 +473,11 @@ void loop () {
       }  
     } else accMode = 0;  // modified by MIS for failsave support
 
-    if ((rcOptions & activate[BOXARM]) == 0) okToArm = 1;
+    if ((rcOptions1 & activate1[BOXARM]) == 0 || (rcOptions2 & activate2[BOXARM]) == 0) okToArm = 1;
     if (accMode == 1) STABLEPIN_ON else STABLEPIN_OFF;
 
     if(BARO) {
-      if (rcOptions & activate[BOXBARO]) {
+      if ((rcOptions1 & activate1[BOXBARO]) || (rcOptions2 & activate2[BOXBARO])) {
         if (baroMode == 0) {
           baroMode = 1;
           AltHold = EstAlt;
@@ -430,17 +489,22 @@ void loop () {
       } else baroMode = 0;
     }
     if(MAG) {
-      if (rcOptions & activate[BOXMAG]) {
+      if ((rcOptions1 & activate1[BOXMAG]) || (rcOptions2 & activate2[BOXMAG])) {
         if (magMode == 0) {
           magMode = 1;
           magHold = heading;
         }
       } else magMode = 0;
+      if ((rcOptions1 & activate1[BOXHEADFREE]) || (rcOptions2 & activate2[BOXHEADFREE])) {
+        if (headFreeMode == 0) {
+          headFreeMode = 1;
+        }
+      } else headFreeMode = 0;
     }
     #if defined(GPS)
-      if (rcOptions & activate[BOXGPSHOME]) {GPSModeHome = 1;}
+      if ((rcOptions1 & activate1[BOXGPSHOME]) || (rcOptions2 & activate2[BOXGPSHOME])) {GPSModeHome = 1;}
       else GPSModeHome = 0;
-      if (rcOptions & activate[BOXGPSHOLD]) {GPSModeHold = 1;}
+      if ((rcOptions1 & activate1[BOXGPSHOLD]) || (rcOptions2 & activate2[BOXGPSHOLD])) {GPSModeHold = 1;}
       else GPSModeHold = 0;
     #endif
   }
@@ -490,11 +554,23 @@ void loop () {
     }
   }
 
+
+  #if defined(GPS)
+    if ( (GPSModeHome == 1)) {
+      float radDiff = (GPS_directionToHome-heading) * 0.0174533f;
+      GPS_angle[ROLL]  = constrain(P8[PIDGPS] * sin(radDiff) * GPS_distanceToHome / 10,-D8[PIDGPS]*10,+D8[PIDGPS]*10); // with P=5, 1 meter = 0.5deg inclination
+      GPS_angle[PITCH] = constrain(P8[PIDGPS] * cos(radDiff) * GPS_distanceToHome / 10,-D8[PIDGPS]*10,+D8[PIDGPS]*10); // max inclination = D deg
+    } else {
+      GPS_angle[ROLL]  = 0;
+      GPS_angle[PITCH] = 0;
+    }
+  #endif
+
   //**** PITCH & ROLL & YAW PID ****    
   for(axis=0;axis<3;axis++) {
     if (accMode == 1 && axis<2 ) { //LEVEL MODE
       // 50 degrees max inclination
-      errorAngle = constrain(2*rcCommand[axis],-500,+500) - angle[axis] + accTrim[axis]; //16 bits is ok here
+      errorAngle = constrain(2*rcCommand[axis] + GPS_angle[axis],-500,+500) - angle[axis] + accTrim[axis]; //16 bits is ok here
       #ifdef LEVEL_PDF
         PTerm      = -(int32_t)angle[axis]*P8[PIDLEVEL]/100 ;
       #else  
@@ -533,10 +609,9 @@ void loop () {
   writeServos();
   writeMotors();
 
-  //GPS
   #if defined(GPS)
-    while (GPS_SERIAL.available()) {
-      if (GPS_newFrame(GPS_SERIAL.read())) {
+    while (SerialAvailable(2)) {
+     if (GPS_newFrame(SerialRead(2))) {
         if (GPS_update == 1) GPS_update = 0; else GPS_update = 1;
         if (GPS_fix == 1) {
           if (GPS_fix_home == 0) {

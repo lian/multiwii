@@ -1,6 +1,6 @@
 #include <avr/eeprom.h>
 
-static uint8_t checkNewConf = 146;
+static uint8_t checkNewConf = 148;
 
 typedef struct eep_entry_t{
   void *  var;
@@ -23,7 +23,8 @@ static eep_entry_t eep_entry[] = {
 , &accZero, sizeof(accZero)
 , &magZero, sizeof(magZero)
 , &accTrim, sizeof(accTrim)
-, &activate, sizeof(activate)
+, &activate1, sizeof(activate1)
+, &activate2, sizeof(activate2)
 , &powerTrigger1, sizeof(powerTrigger1)
 };  
 #define EEBLOCK_SIZE sizeof(eep_entry)/sizeof(eep_entry_t)
@@ -56,6 +57,7 @@ void checkFirstTime() {
   P8[PITCH] = 40; I8[PITCH] = 30; D8[PITCH] = 23;
   P8[YAW]  = 85; I8[YAW]  = 0;  D8[YAW]  = 0;
   P8[PIDALT]  = 47; I8[PIDALT]  = 0;  D8[PIDALT]  = 0;
+  P8[PIDGPS]  = 10; I8[PIDGPS]  = 0;  D8[PIDGPS]  = 0;
   P8[PIDVEL]  =  0; I8[PIDVEL]  = 0;  D8[PIDVEL]  = 0;
   P8[PIDLEVEL] = 90; I8[PIDLEVEL] = 45;
   P8[PIDMAG] = 40;
@@ -64,7 +66,7 @@ void checkFirstTime() {
   rollPitchRate = 0;
   yawRate = 0;
   dynThrPID = 0;
-  for(uint8_t i=0;i<8;i++) activate[i] = 0;
+  for(uint8_t i=0;i<CHECKBOXITEMS;i++) {activate1[i] = 0;activate2[i] = 0;}
   accTrim[0] = 0; accTrim[1] = 0;
   powerTrigger1 = 0;
   writeParams();

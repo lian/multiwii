@@ -14,7 +14,11 @@ ControlP5 controlP5;
 Textlabel txtlblWhichcom,version; 
 ListBox commListbox;
 
-int frame_size = 124;
+int CHECKBOXITEMS=10;
+int PIDITEMS=8;
+int frame_size_read = 98+3*PIDITEMS+2*CHECKBOXITEMS;
+int frame_size_write = 8+3*PIDITEMS+2*CHECKBOXITEMS;
+
 
 cGraph g_graph;
 int windowsX    = 800;        int windowsY    = 540;
@@ -23,8 +27,8 @@ int xObj        = 700;        int yObj        = 450;
 int xParam      = 120;        int yParam      = 10;
 int xRC         = 650;        int yRC         = 15;
 int xMot        = 490;        int yMot        = 30;
-int xButton     = 485;        int yButton    = 185;
-int xBox        = xParam+190; int yBox      = yParam+70;
+int xButton     = 485;        int yButton     = 185;
+int xBox        = xParam+190; int yBox        = yParam+70;
 
 boolean axGraph =true,ayGraph=true,azGraph=true,gxGraph=true,gyGraph=true,gzGraph=true,baroGraph=true,headGraph=true, magxGraph =true,magyGraph=true,magzGraph=true;
 boolean debug1Graph = false,debug2Graph = false,debug3Graph = false,debug4Graph = false;
@@ -40,14 +44,14 @@ cDataArray debug1Data   = new cDataArray(100),debug2Data   = new cDataArray(100)
 
 private static final int ROLL = 0, PITCH = 1, YAW = 2, ALT = 3, VEL = 4, LEVEL = 5, MAG = 6;
 
-Numberbox confP[] = new Numberbox[7], confI[] = new Numberbox[7], confD[] = new Numberbox[7];
-Numberbox confRC_RATE, confRC_EXPO, rollPitchRate, yawRate, dynamic_THR_PID;
+Numberbox confP[] = new Numberbox[PIDITEMS], confI[] = new Numberbox[PIDITEMS], confD[] = new Numberbox[PIDITEMS];
+int       byteP[] = new int[PIDITEMS],       byteI[] = new int[PIDITEMS],       byteD[] = new int[PIDITEMS];
 
-int byteP[] = new int[7], byteI[] = new int[7],byteD[] = new int[7];
+Numberbox confRC_RATE, confRC_EXPO, rollPitchRate, yawRate, dynamic_THR_PID;
 
 int  byteRC_RATE,byteRC_EXPO, byteRollPitchRate,byteYawRate, byteDynThrPID;
 
-Slider rcStickThrottleSlider,rcStickRollSlider,rcStickPitchSlider,rcStickYawSlider,rcStickAUX1Slider,rcStickAUX2Slider,rcStickCAM1Slider,rcStickCAM2Slider;
+Slider rcStickThrottleSlider,rcStickRollSlider,rcStickPitchSlider,rcStickYawSlider,rcStickAUX1Slider,rcStickAUX2Slider,rcStickAUX3Slider,rcStickAUX4Slider;
 
 Slider motSliderV0,motSliderV1,motSliderV2,motSliderV3,motSliderV4,motSliderV5;
 Slider servoSliderH1,servoSliderH2,servoSliderH3,servoSliderH4,servoSliderV0,servoSliderV1,servoSliderV2;
@@ -76,14 +80,17 @@ float mot[] = new float[8];
 
 float servo0=1500,servo1=1500,servo2=1500,servo3=1500;
 float rcThrottle = 1500,rcRoll = 1500,rcPitch = 1500,rcYaw =1500,
-      rcAUX1=1500, rcAUX2=1500, rcCAM1=1500, rcCAM2=1500;
+      rcAUX1=1500, rcAUX2=1500, rcAUX3=1500, rcAUX4=1500;
 int nunchukPresent,i2cAccPresent,i2cBaroPresent,i2cMagnetoPresent,GPSPresent,levelMode;
 
 float time1,time2;
 int cycleTime;
 
-CheckBox checkbox[] = new CheckBox[8];
-int activation[] = new int[8];
+CheckBox checkbox1[] = new CheckBox[CHECKBOXITEMS];
+CheckBox checkbox2[] = new CheckBox[CHECKBOXITEMS];
+int activation1[] = new int[CHECKBOXITEMS];
+int activation2[] = new int[CHECKBOXITEMS];
+
 
 PFont font8,font12,font15;
 
@@ -107,7 +114,7 @@ controlP5.Controller hideLabel(controlP5.Controller c) {
 void setup() {
   size(windowsX,windowsY,OPENGL);
   frameRate(20); 
-  
+
   font8 = createFont("Arial bold",8,false);font12 = createFont("Arial bold",12,false);font15 = createFont("Arial bold",15,false);
 
   controlP5 = new ControlP5(this); // initialize the GUI controls
@@ -190,9 +197,9 @@ void setup() {
   axSlider   =         controlP5.addSlider("axSlider",-1000,+1000,0,x+20,y1+10,50,10);axSlider.setDecimalPrecision(0);axSlider.setLabel("");
   aySlider   =         controlP5.addSlider("aySlider",-1000,+1000,0,x+20,y1+20,50,10);aySlider.setDecimalPrecision(0);aySlider.setLabel("");
   azSlider   =         controlP5.addSlider("azSlider",-1000,+1000,0,x+20,y1+30,50,10);azSlider.setDecimalPrecision(0);azSlider.setLabel("");
-  gxSlider   =           controlP5.addSlider("gxSlider",-500,+500,0,x+20,y2+10,50,10);gxSlider.setDecimalPrecision(0);gxSlider.setLabel("");
-  gySlider   =           controlP5.addSlider("gySlider",-500,+500,0,x+20,y2+20,50,10);gySlider.setDecimalPrecision(0);gySlider.setLabel("");
-  gzSlider   =           controlP5.addSlider("gzSlider",-500,+500,0,x+20,y2+30,50,10);gzSlider.setDecimalPrecision(0);gzSlider.setLabel("");
+  gxSlider   =           controlP5.addSlider("gxSlider",-5000,+5000,0,x+20,y2+10,50,10);gxSlider.setDecimalPrecision(0);gxSlider.setLabel("");
+  gySlider   =           controlP5.addSlider("gySlider",-5000,+5000,0,x+20,y2+20,50,10);gySlider.setDecimalPrecision(0);gySlider.setLabel("");
+  gzSlider   =           controlP5.addSlider("gzSlider",-5000,+5000,0,x+20,y2+30,50,10);gzSlider.setDecimalPrecision(0);gzSlider.setLabel("");
   baroSlider =        controlP5.addSlider("baroSlider",-30000,+30000,0,x+20,y3 ,50,10);baroSlider.setDecimalPrecision(1);baroSlider.setLabel("");
   headSlider  =          controlP5.addSlider("headSlider",-200,+200,0,x+20,y4  ,50,10);headSlider.setDecimalPrecision(0);headSlider.setLabel("");
   magxSlider  =      controlP5.addSlider("magxSlider",-5000,+5000,0,x+20,y5+10,50,10);magxSlider.setDecimalPrecision(0);magxSlider.setLabel("");
@@ -203,15 +210,14 @@ void setup() {
   debug3Slider  =    controlP5.addSlider("debug3Slider",-32000,+32000,0,x+370,y6,50,10);debug3Slider.setDecimalPrecision(0);debug3Slider.setLabel("");
   debug4Slider  =    controlP5.addSlider("debug4Slider",-32000,+32000,0,x+490,y6,50,10);debug4Slider.setDecimalPrecision(0);debug4Slider.setLabel("");
 
-  for(int i=0;i<7;i++) {
+  for(int i=0;i<8;i++) {
     confP[i] = (controlP5.Numberbox) hideLabel(controlP5.addNumberbox("confP"+i,0,xParam+40,yParam+20+i*20,30,14));
-    confP[i].setColorBackground(red_);confP[i].setMin(0);confP[i].setDirection(Controller.HORIZONTAL);confP[i].setDecimalPrecision(1);confP[i].setMultiplier(0.1);confP[i].setMax(20);}
-  for(int i=0;i<6;i++) {
+    confP[i].setColorBackground(red_);confP[i].setMin(0);confP[i].setDirection(Controller.HORIZONTAL);confP[i].setDecimalPrecision(1);confP[i].setMultiplier(0.1);confP[i].setMax(20);
     confI[i] = (controlP5.Numberbox) hideLabel(controlP5.addNumberbox("confI"+i,0,xParam+75,yParam+20+i*20,40,14));
-    confI[i].setColorBackground(red_);confI[i].setMin(0);confI[i].setDirection(Controller.HORIZONTAL);confI[i].setDecimalPrecision(3);confI[i].setMultiplier(0.001);confI[i].setMax(0.250);}
-  for(int i=0;i<5;i++) {
+    confI[i].setColorBackground(red_);confI[i].setMin(0);confI[i].setDirection(Controller.HORIZONTAL);confI[i].setDecimalPrecision(3);confI[i].setMultiplier(0.001);confI[i].setMax(0.250);
     confD[i] = (controlP5.Numberbox) hideLabel(controlP5.addNumberbox("confD"+i,0,xParam+120,yParam+20+i*20,30,14));
     confD[i].setColorBackground(red_);confD[i].setMin(0);confD[i].setDirection(Controller.HORIZONTAL);confD[i].setDecimalPrecision(0);confD[i].setMultiplier(1);confD[i].setMax(50);}
+  confD[6].hide();confI[7].hide();confD[7].hide();
 
   rollPitchRate = (controlP5.Numberbox) hideLabel(controlP5.addNumberbox("rollPitchRate",0,xParam+160,yParam+30,30,14));rollPitchRate.setDecimalPrecision(2);rollPitchRate.setMultiplier(0.01);
   rollPitchRate.setDirection(Controller.HORIZONTAL);rollPitchRate.setMin(0);rollPitchRate.setMax(1);rollPitchRate.setColorBackground(red_);
@@ -225,15 +231,22 @@ void setup() {
   confRC_EXPO = controlP5.addNumberbox("RC EXPO",0,xParam+40,yParam+240,30,14);confRC_EXPO.setDecimalPrecision(2);confRC_EXPO.setMultiplier(0.01);confRC_EXPO.setLabel("");
   confRC_EXPO.setDirection(Controller.HORIZONTAL);confRC_EXPO.setMin(0);confRC_EXPO.setMax(1);confRC_EXPO.setColorBackground(red_);
 
-  for(int i=0;i<8;i++) {
-    checkbox[i] =  controlP5.addCheckBox("cb"+i,xBox+40,yBox+20+13*i);
-    checkbox[i].setColorActive(color(255));checkbox[i].setColorBackground(color(120));
-    checkbox[i].setItemsPerRow(6);checkbox[i].setSpacingColumn(10);
-    checkbox[i].setLabel("");
-    hideLabel(checkbox[i].addItem(i + "1",1));hideLabel(checkbox[i].addItem(i + "2",2));hideLabel(checkbox[i].addItem(i + "3",3));
-    hideLabel(checkbox[i].addItem(i + "4",4));hideLabel(checkbox[i].addItem(i + "5",5));hideLabel(checkbox[i].addItem(i + "6",6));
-  }
+  for(int i=0;i<CHECKBOXITEMS;i++) {
+    checkbox1[i] =  controlP5.addCheckBox("cb"+i,xBox+40,yBox+20+13*i);
+    checkbox1[i].setColorActive(color(255));checkbox1[i].setColorBackground(color(120));
+    checkbox1[i].setItemsPerRow(6);checkbox1[i].setSpacingColumn(10);
+    checkbox1[i].setLabel("");
+    hideLabel(checkbox1[i].addItem(i + "1",1));hideLabel(checkbox1[i].addItem(i + "2",2));hideLabel(checkbox1[i].addItem(i + "3",3));
+    hideLabel(checkbox1[i].addItem(i + "4",4));hideLabel(checkbox1[i].addItem(i + "5",5));hideLabel(checkbox1[i].addItem(i + "6",6));
 
+    checkbox2[i] =  controlP5.addCheckBox("cb_"+i,xBox+170,yBox+20+13*i);
+    checkbox2[i].setColorActive(color(255));checkbox2[i].setColorBackground(color(120));
+    checkbox2[i].setItemsPerRow(6);checkbox2[i].setSpacingColumn(10);
+    checkbox2[i].setLabel("");
+    hideLabel(checkbox2[i].addItem(i + "1_",1));hideLabel(checkbox2[i].addItem(i + "2_",2));hideLabel(checkbox2[i].addItem(i + "3_",3));
+    hideLabel(checkbox2[i].addItem(i + "4_",4));hideLabel(checkbox2[i].addItem(i + "5_",5));hideLabel(checkbox2[i].addItem(i + "6_",6));
+  }
+  
   buttonREAD =      controlP5.addButton("READ",1,xParam+5,yParam+260,60,16);buttonREAD.setColorBackground(red_);
   buttonWRITE =     controlP5.addButton("WRITE",1,xParam+290,yParam+260,60,16);buttonWRITE.setColorBackground(red_);
   buttonCALIBRATE_ACC = controlP5.addButton("CALIB_ACC",1,xParam+210,yParam+260,70,16);buttonCALIBRATE_ACC.setColorBackground(red_);
@@ -245,8 +258,8 @@ void setup() {
   rcStickYawSlider  =     controlP5.addSlider("Yaw",900,2100,1500,xRC,yRC+135,100,10);rcStickYawSlider.setDecimalPrecision(0);
   rcStickAUX1Slider =     controlP5.addSlider("AUX1",900,2100,1500,xRC,yRC+150,100,10);rcStickAUX1Slider.setDecimalPrecision(0);
   rcStickAUX2Slider =     controlP5.addSlider("AUX2",900,2100,1500,xRC,yRC+165,100,10);rcStickAUX2Slider.setDecimalPrecision(0);
-  rcStickCAM1Slider =     controlP5.addSlider("CAM1",900,2100,1500,xRC,yRC+180,100,10);rcStickCAM1Slider.setDecimalPrecision(0);
-  rcStickCAM2Slider =     controlP5.addSlider("CAM2",900,2100,1500,xRC,yRC+195,100,10);rcStickCAM2Slider.setDecimalPrecision(0);
+  rcStickAUX3Slider =     controlP5.addSlider("AUX3",900,2100,1500,xRC,yRC+180,100,10);rcStickAUX3Slider.setDecimalPrecision(0);
+  rcStickAUX4Slider =     controlP5.addSlider("AUX4",900,2100,1500,xRC,yRC+195,100,10);rcStickAUX4Slider.setDecimalPrecision(0);
 
   motSliderV0  = controlP5.addSlider("motSliderV0",1000,2000,1500,0,0,10,100);motSliderV0.setDecimalPrecision(0);
   motSliderV1  = controlP5.addSlider("motSliderV1",1000,2000,1500,0,0,10,100);motSliderV1.setDecimalPrecision(0);
@@ -275,7 +288,7 @@ void draw() {
  
   background(80);
   textFont(font15);
-  text("multiwii.com",0,16);text("v1.9", 0, 32);
+  text("multiwii.com",0,16);text("v1.dev", 0, 32);
   text("Cycle Time:",xGraph+220,yGraph-10);text(cycleTime,xGraph+320,yGraph-10);
 
   textFont(font12);
@@ -296,7 +309,6 @@ void draw() {
     time2=time1;
   }
 
-
   axSlider.setValue(ax);aySlider.setValue(ay);azSlider.setValue(az);gxSlider.setValue(gx);gySlider.setValue(gy);gzSlider.setValue(gz);
   baroSlider.setValue(baro/10);headSlider.setValue(head);magxSlider.setValue(magx);magySlider.setValue(magy);magzSlider.setValue(magz);
   debug1Slider.setValue(debug1/10);debug2Slider.setValue(debug2);debug3Slider.setValue(debug3);debug4Slider.setValue(debug4);
@@ -307,7 +319,7 @@ void draw() {
   servoSliderV0.setValue(servo0);servoSliderV1.setValue(servo1);servoSliderV2.setValue(servo2);
 
   rcStickThrottleSlider.setValue(rcThrottle);rcStickRollSlider.setValue(rcRoll);rcStickPitchSlider.setValue(rcPitch);rcStickYawSlider.setValue(rcYaw);
-  rcStickAUX1Slider.setValue(rcAUX1);rcStickAUX2Slider.setValue(rcAUX2);rcStickCAM1Slider.setValue(rcCAM1);rcStickCAM2Slider.setValue(rcCAM2);
+  rcStickAUX1Slider.setValue(rcAUX1);rcStickAUX2Slider.setValue(rcAUX2);rcStickAUX3Slider.setValue(rcAUX3);rcStickAUX4Slider.setValue(rcAUX4);
 
   stroke(255); 
   a=radians(angx);
@@ -545,10 +557,11 @@ void draw() {
   text("ROLL",xParam+3,yParam+32);text("PITCH",xParam+3,yParam+52);text("YAW",xParam+3,yParam+72);
   text("ALT",xParam+3,yParam+92);
   text("VEL",xParam+3,yParam+112);
-  text("LEVEL",xParam+1,yParam+132);
-  text("MAG",xParam+3,yParam+152); 
+  text("GPS",xParam+3,yParam+132);
+  text("LEVEL",xParam+1,yParam+152);
+  text("MAG",xParam+3,yParam+172); 
   text("Throttle PID",xParam+220,yParam+15);text("attenuation",xParam+220,yParam+30);
-  text("AUX1",xBox+55,yBox+5);text("AUX2",xParam+295,yBox+5);
+  text("AUX1",xBox+55,yBox+5);text("AUX2",xBox+105,yBox+5);
   text("LEVEL",xBox,yBox+30);
   text("BARO",xBox,yBox+43);
   text("MAG",xBox,yBox+56);
@@ -557,9 +570,41 @@ void draw() {
   text("CAMSTAB",xBox-5,yBox+69);
   text("CAMTRIG",xBox-5,yBox+82);
   text("GPS HOME",xBox-5,yBox+108);
-  text("GPS HOLD",xBox-5,yBox+121);
+  //text("GPS HOLD",xBox-5,yBox+121); //not yet
+  text("PASSTHRU",xBox-5,yBox+134);
+  text("HEADFREE",xBox-5,yBox+147);
   text("LOW",xBox+37,yBox+15);text("MID",xBox+57,yBox+15);text("HIGH",xBox+74,yBox+15);
   text("LOW",xBox+100,yBox+15);text("MID",xBox+123,yBox+15);text("HIGH",xBox+140,yBox+15);
+
+  pushMatrix();
+  translate(0,0,0);
+  if (mouseX>xBox && mouseX<xBox+325 && mouseY>yBox && mouseY<yBox+190) {
+    stroke(0);
+    fill(0);
+    rect(xBox+150,yBox-5,xBox+325, yBox+190);
+    stroke(255);fill(255);
+
+    textFont(font12);
+    text("AUX3",xBox+180,yBox+5);text("AUX4",xBox+235,yBox+5);
+    textFont(font8);
+    text("LOW",xBox+37+130,yBox+15);text("MID",xBox+57+130,yBox+15);text("HIGH",xBox+74+130,yBox+15);
+    text("LOW",xBox+100+130,yBox+15);text("MID",xBox+123+130,yBox+15);text("HIGH",xBox+140+130,yBox+15);
+
+    for( i=0;i<CHECKBOXITEMS;i++) {
+      checkbox2[i].show();
+    }
+    motSliderV0.hide(); motSliderV1.hide(); motSliderV2.hide(); motSliderV3.hide(); motSliderV4.hide(); motSliderV5.hide();
+    servoSliderH1.hide(); servoSliderH2.hide(); servoSliderH3.hide(); servoSliderH4.hide(); servoSliderV0.hide(); servoSliderV1.hide(); servoSliderV2.hide();
+    buttonNunchuk.hide();buttonI2cAcc.hide();buttonI2cBaro.hide();buttonI2cMagneto.hide();buttonGPS.hide();
+    buttonI2cAccActive.hide();buttonI2cBaroActive.hide();buttonI2cMagnetoActive.hide();buttonGPSActive.hide();
+  } else {
+    for( i=0;i<CHECKBOXITEMS;i++) {
+      checkbox2[i].hide();
+    }
+    buttonNunchuk.show();buttonI2cAcc.show();buttonI2cBaro.show();buttonI2cMagneto.show();buttonGPS.show();
+    buttonI2cAccActive.show();buttonI2cBaroActive.show();buttonI2cMagnetoActive.show();buttonGPSActive.show();
+  }
+  popMatrix();
 }
 
 void ACC_ROLL(boolean theFlag) {axGraph = theFlag;}
@@ -596,9 +641,7 @@ public void bSTOP() {
 
 public void READ() {
   if(readEnable == false) {return;}
-  for(int i=0;i<5;i++) {confP[i].setValue(byteP[i]/10.0);confI[i].setValue(byteI[i]/1000.0);confD[i].setValue(byteD[i]);}
-  confP[LEVEL].setValue(byteP[LEVEL]/10.0);confI[LEVEL].setValue(byteI[LEVEL]/1000.0);
-  confP[MAG].setValue(byteP[MAG]/10.0);
+  for(int i=0;i<PIDITEMS;i++) {confP[i].setValue(byteP[i]/10.0);confI[i].setValue(byteI[i]/1000.0);confD[i].setValue(byteD[i]);}
   confRC_RATE.setValue(byteRC_RATE/50.0);
   confRC_EXPO.setValue(byteRC_EXPO/100.0);
   rollPitchRate.setValue(byteRollPitchRate/100.0);
@@ -608,14 +651,18 @@ public void READ() {
 
   buttonWRITE.setColorBackground(green_);
 
-  for(int i=0;i<7;i++) {confP[i].setColorBackground(green_);}
-  for(int i=0;i<6;i++) {confI[i].setColorBackground(green_);}
-  for(int i=0;i<5;i++) {confD[i].setColorBackground(green_);}
+  for(int i=0;i<PIDITEMS;i++) {
+    confP[i].setColorBackground(green_);
+    confI[i].setColorBackground(green_);
+    confD[i].setColorBackground(green_);
+  }
   
   confRC_RATE.setColorBackground(green_);confRC_EXPO.setColorBackground(green_);rollPitchRate.setColorBackground(green_);yawRate.setColorBackground(green_);dynamic_THR_PID.setColorBackground(green_);
 
-  for(int i=0;i<8;i++) for(int a=0;a<6;a++)
-    if ((byte(activation[i])&(1<<a))>0) checkbox[i].activate(a); else checkbox[i].deactivate(a);
+  for(int i=0;i<CHECKBOXITEMS;i++) for(int a=0;a<6;a++) {
+    if ((byte(activation1[i])&(1<<a))>0) checkbox1[i].activate(a); else checkbox1[i].deactivate(a);
+    if ((byte(activation2[i])&(1<<a))>0) checkbox2[i].activate(a); else checkbox2[i].deactivate(a);
+  }
 
   confPowerTrigger.setValue(intPowerTrigger);
 
@@ -624,9 +671,10 @@ public void READ() {
 
 public void WRITE() {
   if(writeEnable == false) {return;}
-  for(int i=0;i<7;i++) {byteP[i] = (round(confP[i].value()*10));}
-  for(int i=0;i<6;i++) {byteI[i] = (round(confI[i].value()*1000));}
-  for(int i=0;i<5;i++) {byteD[i] = (round(confD[i].value()));}
+  for(int i=0;i<8;i++) {
+    byteP[i] = (round(confP[i].value()*10));
+    byteI[i] = (round(confI[i].value()*1000));
+    byteD[i] = (round(confD[i].value()));}
 
   byteRC_RATE = (round(confRC_RATE.value()*50));
   byteRC_EXPO = (round(confRC_EXPO.value()*100));
@@ -634,27 +682,30 @@ public void WRITE() {
   byteYawRate = (round(yawRate.value()*100));
   byteDynThrPID = (round(dynamic_THR_PID.value()*100));
 
-  for(int i=0;i<8;i++) {
-    activation[i] = 0;
-    for(int a=0;a<6;a++) activation[i] += (int)(checkbox[i].arrayValue()[a]*(1<<a));
+  for(int i=0;i<CHECKBOXITEMS;i++) {
+    activation1[i] = 0;
+    activation2[i] = 0;
+    for(int a=0;a<6;a++) {
+      activation1[i] += (int)(checkbox1[i].arrayValue()[a]*(1<<a));
+      activation2[i] += (int)(checkbox2[i].arrayValue()[a]*(1<<a));
+    }
   }
+
   
   intPowerTrigger = (round(confPowerTrigger.value()));
 
-  int[] s = new int[34];
+  int[] s = new int[frame_size_write];
   int p = 0;
    s[p++] = 'W'; //0 write to Eeprom @ arduino //1
-   for(int i=0;i<5;i++) {s[p++] = byteP[i];  s[p++] = byteI[i];  s[p++] =  byteD[i];} //16
-   s[p++] = byteP[LEVEL]; s[p++] = byteI[LEVEL]; 
-   s[p++] = byteP[MAG]; 
+   for(int i=0;i<PIDITEMS;i++) {s[p++] = byteP[i];  s[p++] = byteI[i];  s[p++] =  byteD[i];} //16
    s[p++] = byteRC_RATE; s[p++] = byteRC_EXPO; 
    s[p++] = byteRollPitchRate; 
    s[p++] = byteYawRate;
    s[p++] = byteDynThrPID; //24
-   for(int i=0;i<8;i++) s[p++] = activation[i]; //32
+   for(int i=0;i<CHECKBOXITEMS;i++) {s[p++] = activation1[i];s[p++] = activation2[i];}
    s[p++] = intPowerTrigger;
-   s[p++] = intPowerTrigger >>8 &0xff; //34
-   for(int i =0;i<34;i++)    g_serial.write(char(s[i]));
+   s[p++] = intPowerTrigger >>8 &0xff;
+   for(int i =0;i<frame_size_write;i++)    g_serial.write(char(s[i]));
 }
 
 public void CALIB_ACC() {
@@ -674,11 +725,11 @@ void InitSerial(float portValue) {
   init_com=1;
   buttonSTART.setColorBackground(green_);buttonSTOP.setColorBackground(green_);commListbox.setColorBackground(green_);
   graphEnable = true;
-  g_serial.buffer(frame_size+1);
+  g_serial.buffer(frame_size_read+1);
 }
 
 int p;
-byte[] inBuf = new byte[frame_size];
+byte[] inBuf = new byte[frame_size_read];
 
 int read16() {return (inBuf[p++]&0xff) + (inBuf[p++]<<8);}
 int read8()  {return inBuf[p++]&0xff;}
@@ -692,32 +743,30 @@ void processSerialData() {
 
   if (g_serial.read() == 'M') {
     g_serial.readBytes(inBuf);
-    if (inBuf[frame_size-1] == 'M') {  // Multiwii @ arduino send all data to GUI
+    if (inBuf[frame_size_read-1] == 'M') {  // Multiwii @ arduino send all data to GUI
       p=0;
       read8(); //version                                                              //1
       ax = read16();ay = read16();az = read16();
-      gx = read16();gy = read16();gz = read16();                                      //13
-      magx = read16();magy = read16();magz = read16();                                //19
+      gx = read16()/8;gy = read16()/8;gz = read16()/8;                                //13
+      magx = read16()/3;magy = read16()/3;magz = read16()/3;                          //19
       baro = read16();
-      head = read16();                                                                 //23
+      head = read16();                                                                //23
       servo0 = read16();servo1 = read16();servo2 = read16();servo3 = read16();        //31
       for(int i=0;i<8;i++) mot[i] = read16();                                         //47
       rcRoll = read16();rcPitch = read16();rcYaw = read16();rcThrottle = read16();    
-      rcAUX1 = read16();rcAUX2 = read16();rcCAM1 = read16();rcCAM2 = read16();        //63
+      rcAUX1 = read16();rcAUX2 = read16();rcAUX3 = read16();rcAUX4 = read16();        //63
       present = read8(); 
       mode = read8();
       cycleTime = read16();
-      angx = read16();angy = read16();
+      angx = read16()/10;angy = read16()/10;
       multiType = read8();                                                            //72
-      for(int i=0;i<5;i++) {byteP[i] = read8();byteI[i] = read8();byteD[i] = read8();}//87
-      byteP[LEVEL] = read8();byteI[LEVEL] = read8();                                  //89
-      byteP[MAG] = read8(); 
+      for(int i=0;i<PIDITEMS;i++) {byteP[i] = read8();byteI[i] = read8();byteD[i] = read8();}//87
       byteRC_RATE = read8();
       byteRC_EXPO = read8();
       byteRollPitchRate = read8();
       byteYawRate = read8();
       byteDynThrPID = read8();                                                        //95
-      for(int i=0;i<8;i++) activation[i] = read8();                                   //102
+      for(int i=0;i<CHECKBOXITEMS;i++) {activation1[i] = read8();activation2[i] = read8();}
       GPS_distanceToHome = read16();
       GPS_directionToHome = read16();
       GPS_numSat = read8();
