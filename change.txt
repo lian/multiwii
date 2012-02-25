@@ -1,3 +1,60 @@
+1.8 -> 1.9
+    - some factorizations between PPM sum receiver code & standard receiver code
+    - EXPERIMENTAL: integration of direct SBUS receiver thanks to the contribution of Captain IxI & Zaggo
+      For this, you must use:
+         - a MEGA board
+         - the RX1 of the Serial 1 port
+         - have a way to invert the input signal.
+      more info here: http://www.multiwii.com/forum/viewtopic.php?f=7&t=289
+    - EXPERIMENTAL: integration of SPEKTRUM satellite receiver thanks to the contribution of Danal Estes
+      For this, you must use:
+         - a MEGA board
+         - the RX1 of the Serial 1 port
+      It could be used also on ProMini board with some restrictions (exclusive GUI or Spektrum use)
+      more info here: http://www.rcgroups.com/forums/showthread.php?t=1504116
+    - EXPERIMENTAL: integration of direct Serial RX, to command the multi from a Bluetooth+phone Signal for instance.
+      thanks to Luis
+    - many optimizations to reduce loop cycle
+    - GPS main function integration
+        The code to connect and recognize a GPS with NMEA sentences is here.
+        currently calculated:
+          - number of sat
+          - distance to home
+          - direction to home
+	There is currently no control code except a nice working GUI
+	=> there is no code behind GPS HOME and GPS HOLD, in progress
+    - PIN A0 and A1 instead of PIN D5 & D6 for 6 motors config and promini config
+      This mod allows the use of a standard receiver on a pro mini
+      (no need to use a PPM sum receiver)
+      #define A0_A1_PIN_HEX
+    - possibility to use PIN8 or PIN12 as the AUX2 RC input
+      it deactivates in this case the POWER PIN (pin 12) or the BUZZER PIN (pin 8)
+      #define RCAUXPIN8 or #define RCAUXPIN12
+    - thanks to Danal, integration of the Eagle Tree Power Panel LCD for configuration
+      it's an I2C LCD that should be very convenient for the ProMini because it doesn't require the unique Serial Port
+    - all in one FC:
+      QUADRINO_ZOOM board integration
+      MINIWII : Jussi's MiniWii Flight Controller
+    - sensor boards:
+      SIRIUS600       // Sirius Navigator IMU  using the WMP for the gyro
+      CITRUSv1_0      // CITRUSv1 from qcrc.ca
+      DROTEK_IMU10DOF
+    - ATAVRSBIN1 mag direction correction (http://www.multiwii.com/forum/viewtopic.php?f=8&t=506&start=60#p4950)
+    - no need to define anymore PROMINI or MEGA in the sketch:
+      this information is grabed form the board selection in Arduino IDE
+    - LEVEL drift problem:
+      the root of this problem was identified (at least partly).
+      Several options to try to solve it:
+      - adding a #define TRUSTED_ACCZ for those who have huge ACC Z variations when some throttle is applied
+        (it's a test you should do before tructing ACCZ)
+	//#define TRUSTED_ACCZ  -> ACCZ is not taken into account in calculation for small angles
+	#define TRUSTED_ACCZ    -> ACCZ is taken into account in calculation for small angles
+      - BMA180 init changes to another mode: should help to filter noisy setups
+      - adding a #define STAB_OLD_17 for those who still encounter problem with the stable code,
+        as the old 1.7 LEVEL code (less elaborated) doesn't seem to cause drift.
+     - some flying wing code upgrade (thanks to the suggestion of Hamburger)
+     - ACC added: LSM303DLx_ACC
+
 1.8 patch 2:
     - integration of SIRIUS 9DOF + baro IMU
     - debugging FREEIMUv035_MS baro code

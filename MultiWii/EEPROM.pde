@@ -1,6 +1,6 @@
 #include <avr/eeprom.h>
 
-static uint8_t checkNewConf = 144;
+static uint8_t checkNewConf = 146;
 
 typedef struct eep_entry_t{
   void *  var;
@@ -11,8 +11,8 @@ typedef struct eep_entry_t{
 // EEPROM Layout definition
 // ************************************************************************************************************
 static eep_entry_t eep_entry[] = {
-  &checkNewConf, sizeof(checkNewConf),
-  &P8, sizeof(P8)
+  &checkNewConf, sizeof(checkNewConf)
+, &P8, sizeof(P8)
 , &I8, sizeof(I8) 
 , &D8, sizeof(D8) 
 , &rcRate8, sizeof(rcRate8)
@@ -20,13 +20,11 @@ static eep_entry_t eep_entry[] = {
 , &rollPitchRate, sizeof(rollPitchRate)
 , &yawRate, sizeof(yawRate)
 , &dynThrPID, sizeof(dynThrPID)
-, &activate, sizeof(activate)
 , &accZero, sizeof(accZero)
 , &magZero, sizeof(magZero)
 , &accTrim, sizeof(accTrim)
-#if defined(POWERMETER)
+, &activate, sizeof(activate)
 , &powerTrigger1, sizeof(powerTrigger1)
-#endif
 };  
 #define EEBLOCK_SIZE sizeof(eep_entry)/sizeof(eep_entry_t)
 // ************************************************************************************************************
@@ -54,8 +52,8 @@ void writeParams() {
 void checkFirstTime() {
   uint8_t test_val; eeprom_read_block((void*)&test_val, (void*)(0), sizeof(test_val));
   if (test_val == checkNewConf) return;
-  P8[ROLL] = 40; I8[ROLL] = 30; D8[ROLL] = 17;
-  P8[PITCH] = 40; I8[PITCH] = 30; D8[PITCH] = 17;
+  P8[ROLL] = 40; I8[ROLL] = 30; D8[ROLL] = 23;
+  P8[PITCH] = 40; I8[PITCH] = 30; D8[PITCH] = 23;
   P8[YAW]  = 85; I8[YAW]  = 0;  D8[YAW]  = 0;
   P8[PIDALT]  = 47; I8[PIDALT]  = 0;  D8[PIDALT]  = 0;
   P8[PIDVEL]  =  0; I8[PIDVEL]  = 0;  D8[PIDVEL]  = 0;
@@ -66,11 +64,9 @@ void checkFirstTime() {
   rollPitchRate = 0;
   yawRate = 0;
   dynThrPID = 0;
-  for(uint8_t i=0;i<6;i++) activate[i] = 0;
+  for(uint8_t i=0;i<8;i++) activate[i] = 0;
   accTrim[0] = 0; accTrim[1] = 0;
-#if defined(POWERMETER)
   powerTrigger1 = 0;
-#endif
   writeParams();
 }
 

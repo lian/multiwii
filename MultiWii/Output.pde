@@ -3,8 +3,10 @@
   #define SERVO
 #endif
 
-#if defined(GIMBAL) || defined(FLYING_WING)
+#if defined(GIMBAL)
   #define NUMBER_MOTOR 0
+#elif defined(FLYING_WING)
+  #define NUMBER_MOTOR 1
 #elif defined(BI)
   #define NUMBER_MOTOR 2
 #elif defined(TRI)
@@ -62,11 +64,13 @@ void writeAllMotors(int16_t mc) {   // Sends commands to all motors
 void logMotorsPower() {
   uint32_t amp;
   /* true cubic function; when divided by vbat_max=126 (12.6V) for 3 cell battery this gives maximum value of ~ 1000 */
-  const uint32_t amperes[16] =   {31, 246, 831, 1969, 3845, 6645, 10551, 15750, 22425, 30762, 40944, 53156, 67583, 84410, 103821, 126000 };
-
+  const uint32_t amperes[64] =   {0,4,13,31,60,104,165,246,350,481,640,831,1056,1319,1622,1969,2361,2803,3297,3845,4451,5118,5848,6645,
+	                             7510,8448,9461,10551,11723,12978,14319,15750,17273,18892,20608,22425,24346,26374,28512,30762,33127,35611,
+	                             38215,40944,43799,46785,49903,53156,56548,60081,63759,67583,71558,75685,79968,84410,89013,93781,98716,103821,
+	                             109099,114553,120186,126000 };
   if (vbat) { // by all means - must avoid division by zero 
     for (uint8_t i =0;i<NUMBER_MOTOR;i++) {
-      amp = amperes[(motor[i] - 1000)>>6] / vbat; // range mapped from [1000:2000] => [0:1000]; then break that up into 16 ranges; lookup amp
+      amp = amperes[(motor[i] - 1000)>>4] / vbat; // range mapped from [1000:2000] => [0:1000]; then break that up into 64 ranges; lookup amp
       #ifdef LOG_VALUES
          pMeter[i]+= amp; // sum up over time the mapped ESC input 
       #endif
@@ -87,24 +91,28 @@ void initOutput() {
     initializeServo();
   #elif (NUMBER_MOTOR == 6) && defined(PROMINI)
     initializeSoftPWM();
+    #if defined(A0_A1_PIN_HEX)
+      pinMode(5,INPUT);pinMode(6,INPUT);     // we reactivate the INPUT affectation for these two PINs
+      pinMode(A0,OUTPUT);pinMode(A1,OUTPUT);
+    #endif
   #endif
 }
 
 #if defined(SERVO)
 void initializeServo() {
   #if defined(TRI)
-    DIGITAL_SERVO_TRI_PINMODE
+    DIGITAL_SERVO_TRI_PINMODE;
   #endif
   #if defined(SERVO_TILT) || defined(GIMBAL) || defined(FLYING_WING)
-    DIGITAL_TILT_ROLL_PINMODE
-    DIGITAL_TILT_PITCH_PINMODE
+    DIGITAL_TILT_ROLL_PINMODE;
+    DIGITAL_TILT_PITCH_PINMODE;
   #endif
   #if defined(CAMTRIG)
-    DIGITAL_CAM_PINMODE
+    DIGITAL_CAM_PINMODE;
   #endif
   #if defined(BI)
-    DIGITAL_SERVO_TRI_PINMODE
-    DIGITAL_BI_LEFT_PINMODE
+    DIGITAL_SERVO_TRI_PINMODE;
+    DIGITAL_BI_LEFT_PINMODE;
   #endif
   TCCR0A = 0; // normal counting mode
   TIMSK0 |= (1<<OCIE0A); // Enable CTC interrupt
@@ -126,7 +134,7 @@ ISR(TIMER0_COMPA_vect) {
   if (state == 0) {
     //http://billgrundmann.wordpress.com/2009/03/03/to-use-or-not-use-writedigital/
     #if defined(TRI) || defined (BI)
-      DIGITAL_SERVO_TRI_HIGH
+      DIGITAL_SERVO_TRI_HIGH;
     #endif
     OCR0A+= 250; // 1000 us
     state++ ;
@@ -135,13 +143,13 @@ ISR(TIMER0_COMPA_vect) {
     state++;
   } else if (state == 2) {
     #if defined(TRI) || defined (BI)
-      DIGITAL_SERVO_TRI_LOW
+      DIGITAL_SERVO_TRI_LOW;
     #endif
     #if defined(BI)
-      DIGITAL_BI_LEFT_HIGH
+      DIGITAL_BI_LEFT_HIGH;
     #endif
     #if defined(SERVO_TILT) || defined(GIMBAL) || defined(FLYING_WING)
-      DIGITAL_TILT_PITCH_HIGH
+      DIGITAL_TILT_PITCH_HIGH;
     #endif
     OCR0A+= 250; // 1000 us
     state++;
@@ -150,11 +158,11 @@ ISR(TIMER0_COMPA_vect) {
     state++;
   } else if (state == 4) {
     #if defined(SERVO_TILT) || defined(GIMBAL) || defined(FLYING_WING)
-      DIGITAL_TILT_PITCH_LOW
-      DIGITAL_TILT_ROLL_HIGH
+      DIGITAL_TILT_PITCH_LOW;
+      DIGITAL_TILT_ROLL_HIGH;
     #endif
     #if defined(BI)
-      DIGITAL_BI_LEFT_LOW
+      DIGITAL_BI_LEFT_LOW;
     #endif
     state++;
     OCR0A+= 250; // 1000 us
@@ -163,10 +171,10 @@ ISR(TIMER0_COMPA_vect) {
     state++;
   } else if (state == 6) {
     #if defined(SERVO_TILT) || defined(GIMBAL) || defined(FLYING_WING)
-      DIGITAL_TILT_ROLL_LOW
+      DIGITAL_TILT_ROLL_LOW;
     #endif
     #if defined(CAMTRIG)
-      DIGITAL_CAM_HIGH
+      DIGITAL_CAM_HIGH;
     #endif
     state++;
     OCR0A+= 250; // 1000 us
@@ -175,7 +183,7 @@ ISR(TIMER0_COMPA_vect) {
     state++;
   } else if (state == 8) {
     #if defined(CAMTRIG)
-      DIGITAL_CAM_LOW
+      DIGITAL_CAM_LOW;
     #endif
     count = 10; // 12 x 1000 us
     state++;
@@ -198,14 +206,22 @@ void initializeSoftPWM() {
 ISR(TIMER0_COMPA_vect) {
   static uint8_t state = 0;
   if (state == 0) {
-    PORTD |= 1<<5; //digital PIN 5 high
+    #if not defined(A0_A1_PIN_HEX)
+      PORTD |= 1<<5; //digital PIN 5 high
+    #else
+      PORTC |= 1<<0;//PIN A0
+    #endif
     OCR0A+= atomicPWM_PIN5_highState; //250 x 4 microsecons = 1ms
     state = 1;
   } else if (state == 1) {
     OCR0A+= atomicPWM_PIN5_highState;
     state = 2;
   } else if (state == 2) {
-    PORTD &= ~(1<<5); //digital PIN 5 low
+    #if not defined(A0_A1_PIN_HEX)
+      PORTD &= ~(1<<5); //digital PIN 5 low
+    #else
+      PORTC &= ~(1<<0);
+    #endif 
     OCR0A+= atomicPWM_PIN5_lowState;
     state = 0;
   }
@@ -214,20 +230,33 @@ ISR(TIMER0_COMPA_vect) {
 ISR(TIMER0_COMPB_vect) { //the same with digital PIN 6 and OCR0B counter
   static uint8_t state = 0;
   if (state == 0) {
-    PORTD |= 1<<6;OCR0B+= atomicPWM_PIN6_highState;state = 1;
+    #if not defined(A0_A1_PIN_HEX)
+      PORTD |= 1<<6;
+    #else
+      PORTC |= 1<<1;//PIN A1
+    #endif
+    OCR0B+= atomicPWM_PIN6_highState;state = 1;
   } else if (state == 1) {
     OCR0B+= atomicPWM_PIN6_highState;state = 2;
   } else if (state == 2) {
-    PORTD &= ~(1<<6);OCR0B+= atomicPWM_PIN6_lowState;state = 0;
+    #if not defined(A0_A1_PIN_HEX)
+      PORTD &= ~(1<<6);
+    #else
+      PORTC &= ~(1<<1);
+    #endif
+    OCR0B+= atomicPWM_PIN6_lowState;state = 0;
   }
 }
 #endif
 
 
 void mixTable() {
-  int16_t maxMotor,a;
+  int16_t maxMotor;
   uint8_t i,axis;
-
+  static uint8_t camCycle = 0;
+  static uint8_t camState = 0;
+  static uint32_t camTime = 0;
+  
   #define PIDMIX(X,Y,Z) rcCommand[THROTTLE] + axisPID[ROLL]*X + axisPID[PITCH]*Y + YAW_DIRECTION * axisPID[YAW]*Z
 
   #if NUMBER_MOTOR > 3
@@ -333,8 +362,37 @@ void mixTable() {
     servo[2] = constrain(TILT_ROLL_MIDDLE + TILT_ROLL_PROP   * angle[ROLL]  /16 + rcCommand[ROLL], TILT_ROLL_MIN, TILT_ROLL_MAX);
   #endif
   #ifdef FLYING_WING
-    servo[1]  = constrain(1500 + axisPID[PITCH] - axisPID[ROLL], 1020, 2000); //LEFT the direction of the 2 servo can be changed here: invert the sign before axisPID
-    servo[2]  = constrain(1500 + axisPID[PITCH] + axisPID[ROLL], 1020, 2000); //RIGHT
+   motor[0] = rcCommand[THROTTLE];
+    //if (passthroughMode) {// use raw stick values to drive output 
+    // follow aux1 as being three way switch **NOTE: better to implement via check boxes in GUI 
+    if (rcData[AUX1]<1300) { // passthrough
+       servo[1]  = constrain(WING_LEFT_MID  + PITCH_DIRECTION_L * (rcData[PITCH]-MIDRC) + ROLL_DIRECTION_L * (rcData[ROLL]-MIDRC), WING_LEFT_MIN,  WING_LEFT_MAX); //LEFT
+       servo[2]  = constrain(WING_RIGHT_MID + PITCH_DIRECTION_R * (rcData[PITCH]-MIDRC) + ROLL_DIRECTION_R * (rcData[ROLL]-MIDRC), WING_RIGHT_MIN, WING_RIGHT_MAX); //RIGHT
+    } else { // use sensors to correct (gyro only or gyro+acc according to aux1/aux2 configuration
+       servo[1]  = constrain(WING_LEFT_MID  + PITCH_DIRECTION_L * axisPID[PITCH]        + ROLL_DIRECTION_L * axisPID[ROLL], WING_LEFT_MIN,  WING_LEFT_MAX); //LEFT
+       servo[2]  = constrain(WING_RIGHT_MID + PITCH_DIRECTION_R * axisPID[PITCH]        + ROLL_DIRECTION_R * axisPID[ROLL], WING_RIGHT_MIN, WING_RIGHT_MAX); //RIGHT
+    }
+  #endif
+  #if defined(CAMTRIG)
+    if (camCycle==1) {
+      if (camState == 0) {
+        servo[3] = CAM_SERVO_HIGH;
+        camState = 1;
+        camTime = millis();
+      } else if (camState == 1) {
+       if ( (millis() - camTime) > CAM_TIME_HIGH ) {
+         servo[3] = CAM_SERVO_LOW;
+         camState = 2;
+         camTime = millis();
+       }
+      } else { //camState ==2
+       if ( (millis() - camTime) > CAM_TIME_LOW ) {
+         camState = 0;
+         camCycle = 0;
+       }
+      }
+    }
+    if (rcOptions & activate[BOXCAMTRIG]) camCycle=1;
   #endif
 
   maxMotor=motor[0];
@@ -353,5 +411,9 @@ void mixTable() {
     if (armed == 0)
       motor[i] = MINCOMMAND;
   }
+
+  #if defined(LOG_VALUES) || (POWERMETER == 1)
+    logMotorsPower();
+  #endif
 }
 

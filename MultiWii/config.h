@@ -19,9 +19,9 @@
 //#define Y6
 //#define HEX6
 //#define HEX6X
-//#define OCTOX8 //beta
-//#define OCTOFLATP //beta
-//#define OCTOFLATX //beta
+//#define OCTOX8
+//#define OCTOFLATP
+//#define OCTOFLATX
 //#define FLYING_WING //experimental
 
 #define YAW_DIRECTION 1 // if you want to reverse the yaw correction direction
@@ -30,48 +30,49 @@
 #define I2C_SPEED 100000L     //100kHz normal mode, this value must be used for a genuine WMP
 //#define I2C_SPEED 400000L   //400kHz fast mode, it works only with some WMP clones
 
-#define PROMINI  //Arduino type
-//#define MEGA
-
 //enable internal I2C pull ups
 #define INTERNAL_I2C_PULLUPS
 
+
 //****** advanced users settings   *************
 
+/* This option should be uncommented if ACC Z is accurate enough when motors are running*/
+//#define TRUSTED_ACCZ
+
+/* PIN A0 and A1 instead of PIN D5 & D6 for 6 motors config and promini config
+   This mod allow the use of a standard receiver on a pro mini
+   (no need to use a PPM sum receiver)
+*/
+//#define A0_A1_PIN_HEX
+
+/* possibility to use PIN8 or PIN12 as the AUX2 RC input
+   it deactivates in this case the POWER PIN (pin 12) or the BUZZER PIN (pin 8)
+*/
+//#define RCAUXPIN8
+//#define RCAUXPIN12
+
+/* This option is here if you want to use the old level code from the verison 1.7
+   It's just to have some feedback. This will be removed in the future */
+//#define STAB_OLD_17
+
+/* GPS
+   only available on MEGA boards (this might be possible on 328 based boards in the future)
+   if enabled, define here the Arduino Serial port number and the UART speed
+   note: only the RX PIN is used, the GPS is not configured by multiwii
+   the GPS must be configured to output NMEA sentences (which is generally the default conf for most GPS devices)
+*/
+//#define GPS
+//#define GPS_SERIAL Serial3 // should be Serial2 for flyduino v2
+//#define GPS_BAUD   4800
+//#define GPS_BAUD   9600
+
 /* Pseudo-derivative conrtroller for level mode (experimental)
-   Additional information: http://wbb.multiwii.com/viewtopic.php?f=8&t=503 */
+   Additional information: http://www.multiwii.com/forum/viewtopic.php?f=8&t=503 */
 //#define LEVEL_PDF
 
 /* introduce a deadband around the stick center
    Must be greater than zero, comment if you dont want a deadband on roll, pitch and yaw */
 //#define DEADBAND 6
-
-/* Failsave settings - added by MIS
-   Failsafe check pulse on THROTTLE channel. If the pulse is OFF (on only THROTTLE or on all channels) the failsafe procedure is initiated.
-   After FAILSAVE_DELAY time of pulse absence, the level mode is on (if ACC or nunchuk is avaliable), PITCH, ROLL and YAW is centered
-   and THROTTLE is set to FAILSAVE_THR0TTLE value. You must set this value to descending about 1m/s or so for best results. 
-   This value is depended from your configuration, AUW and some other params. 
-   Next, afrer FAILSAVE_OFF_DELAY the copter is disarmed, and motors is stopped.
-   If RC pulse coming back before reached FAILSAVE_OFF_DELAY time, after the small quard time the RC control is returned to normal.
-   If you use serial sum PPM, the sum converter must completly turn off the PPM SUM pusles for this FailSafe functionality.*/
-#define FAILSAFE                                  // Alex: comment this line if you want to deactivate the failsafe function
-#define FAILSAVE_DELAY     10                     // Guard time for failsafe activation after signal lost. 1 step = 0.1sec - 1sec in example
-#define FAILSAVE_OFF_DELAY 200                    // Time for Landing before motors stop in 0.1sec. 1 step = 0.1sec - 20sec in example
-#define FAILSAVE_THR0TTLE  (MINTHROTTLE + 200)    // Throttle level used for landing - may be relative to MINTHROTTLE - as in this case
-
-
-/* The following lines apply only for a pitch/roll tilt stabilization system
-   On promini board, it is not compatible with config with 6 motors or more
-   Uncomment the first line to activate it */
-//#define SERVO_TILT
-#define TILT_PITCH_MIN    1020    //servo travel min, don't set it below 1020
-#define TILT_PITCH_MAX    2000    //servo travel max, max value=2000
-#define TILT_PITCH_MIDDLE 1500    //servo neutral value
-#define TILT_PITCH_PROP   10      //servo proportional (tied to angle) ; can be negative to invert movement
-#define TILT_ROLL_MIN     1020
-#define TILT_ROLL_MAX     2000
-#define TILT_ROLL_MIDDLE  1500
-#define TILT_ROLL_PROP    10
 
 /* if you use a specific sensor board:
    please submit any correction to this list.
@@ -83,13 +84,19 @@
 //#define FREEIMUv03      // FreeIMU v0.3 and v0.3.1
 //#define FREEIMUv035     // FreeIMU v0.3.5 no baro
 //#define FREEIMUv035_MS  // FreeIMU v0.3.5_MS                                                <- confirmed by Alex
-//#define FREEIMUv035_BMP // FreeIMU v0.3.5_MS
+//#define FREEIMUv035_BMP // FreeIMU v0.3.5_BMP
 //#define PIPO            // 9DOF board from erazz
-//#define QUADRINO        // full FC board 9DOF+baro board from witespy                       <- confirmed by Alex
+//#define QUADRINO        // full FC board 9DOF+baro board from witespy  with BMP085 baro     <- confirmed by Alex
+//#define QUADRINO_ZOOM   // full FC board 9DOF+baro board from witespy  second edition       <- confirmed by Alex
 //#define ALLINONE        // full FC board or standalone 9DOF+baro board from CSG_EU
 //#define AEROQUADSHIELDv2
-//#define ATAVRSBIN1      // Atmel 9DOF (Contribution by EOSBandi). The board requires 3.3V power.
+//#define ATAVRSBIN1      // Atmel 9DOF (Contribution by EOSBandi). requires 3.3V power.
 //#define SIRIUS          // Sirius Navigator IMU                                             <- confirmed by Alex
+//#define SIRIUS600       // Sirius Navigator IMU  using the WMP for the gyro
+//#define MINIWII         // Jussi's MiniWii Flight Controller
+//#define CITRUSv1_0      // CITRUSv1 from qcrc.ca
+//#define DROTEK_IMU10DOF
+
 
 //if you use independent sensors
 //leave it commented it you already checked a specific board above
@@ -103,10 +110,11 @@
 //#define BMA180
 //#define NUNCHACK  // if you want to use the nunckuk as a standalone I2C ACC without WMP
 //#define LIS3LV02
+//#define LSM303DLx_ACC
 
 /* I2C barometer */
 //#define BMP085
-//#define MS561101BA  //non tested
+//#define MS561101BA
 
 /* I2C magnetometer */
 //#define HMC5843
@@ -135,8 +143,59 @@
 //#define SERIAL_SUM_PPM         ROLL,PITCH,THROTTLE,YAW,AUX1,AUX2,CAMPITCH,CAMROLL //For Robe/Hitec/Futaba
 //#define SERIAL_SUM_PPM         PITCH,ROLL,THROTTLE,YAW,AUX1,AUX2,CAMPITCH,CAMROLL //For some Hitec/Sanwa/Others
 
-/* The following lines apply only for Spektrum Satellite Receiver on MEGA boards only */ //not yet implemented
-//#define SPEKTRUM
+/* The following lines apply only for Spektrum Satellite Receiver
+   Spektrum Satellites are 3V devices.  DO NOT connect to 5V!
+   For MEGA boards, attach sat grey wire to RX1, pin 19. Sat black wire to ground. Sat orange wire to Mega board's 3.3V (or any other 3V to 3.3V source).
+   For PROMINI, attach sat grey to RX0.  Attach sat black to ground.  
+     There is no 3.3V source on a pro mini; you can either use a different 3V source, or attach orange to 5V with a 3V regulator in-line (such as http://search.digikey.com/scripts/DkSearch/dksus.dll?Detail&name=MCP1700-3002E/TO-ND)
+     If you use an inline-regulator, a standard 3-pin servo connector can connect to ground, +5V, and RX0; solder the correct wires (and the 3V regulator!) to a Spektrum baseRX-to-Sat cable that has been cut in half. 
+     NOTE: Because there is only one serial port on the Pro Mini, using a Spektrum Satellite implies you CANNOT use the PC based configuration tool. Further, you cannot use on-aircraft serial LCD as the baud rates are incompatible. You can configure by one of two methods:
+       1) Coming soon: Use an on-aircraft Eagle Tree LCD for setting gains, reading sensors, etc. 
+       2) Available now: Comment out the Spektrum definition, upload, plug in PC, configure; uncomment the Spektrum definition, upload, plug in RX, and fly.  Repeat as required to configure. 
+   (Contribution by Danal) */
+//#define SPEKTRUM 1024
+//#define SPEKTRUM 2048
+
+
+/* EXPERIMENTAL !!
+   contribution from Captain IxI and Zaggo
+   cf http://www.multiwii.com/forum/viewtopic.php?f=7&t=289
+   The following line apply only for Futaba S-Bus Receiver on MEGA boards at RX1 only (Serial 1).
+   You have to invert the S-Bus-Serial Signal e.g. with a Hex-Inverter like IC SN74 LS 04 */
+//#define SBUS
+
+/* Failsave settings - added by MIS
+   Failsafe check pulse on THROTTLE channel. If the pulse is OFF (on only THROTTLE or on all channels) the failsafe procedure is initiated.
+   After FAILSAVE_DELAY time of pulse absence, the level mode is on (if ACC or nunchuk is avaliable), PITCH, ROLL and YAW is centered
+   and THROTTLE is set to FAILSAVE_THR0TTLE value. You must set this value to descending about 1m/s or so for best results. 
+   This value is depended from your configuration, AUW and some other params. 
+   Next, afrer FAILSAVE_OFF_DELAY the copter is disarmed, and motors is stopped.
+   If RC pulse coming back before reached FAILSAVE_OFF_DELAY time, after the small quard time the RC control is returned to normal.
+   If you use serial sum PPM, the sum converter must completly turn off the PPM SUM pusles for this FailSafe functionality.*/
+#define FAILSAFE                                  // Alex: comment this line if you want to deactivate the failsafe function
+#define FAILSAVE_DELAY     10                     // Guard time for failsafe activation after signal lost. 1 step = 0.1sec - 1sec in example
+#define FAILSAVE_OFF_DELAY 200                    // Time for Landing before motors stop in 0.1sec. 1 step = 0.1sec - 20sec in example
+#define FAILSAVE_THR0TTLE  (MINTHROTTLE + 200)    // Throttle level used for landing - may be relative to MINTHROTTLE - as in this case
+
+/* EXPERIMENTAL !!
+  contribution from Luis Correia
+  see http://www.multiwii.com/forum/viewtopic.php?f=18&t=828
+  It uses a Bluetooth Serial module as the input for controlling the device via an Android application
+  As with the SPEKTRUM option, is not possible to use the configuration tool on a mini or promini. */
+//#define BTSERIAL
+
+/* The following lines apply only for a pitch/roll tilt stabilization system
+   On promini board, it is not compatible with config with 6 motors or more
+   Uncomment the first line to activate it */
+//#define SERVO_TILT
+#define TILT_PITCH_MIN    1020    //servo travel min, don't set it below 1020
+#define TILT_PITCH_MAX    2000    //servo travel max, max value=2000
+#define TILT_PITCH_MIDDLE 1500    //servo neutral value
+#define TILT_PITCH_PROP   10      //servo proportional (tied to angle) ; can be negative to invert movement
+#define TILT_ROLL_MIN     1020
+#define TILT_ROLL_MAX     2000
+#define TILT_ROLL_MIDDLE  1500
+#define TILT_ROLL_PROP    10
 
 /* interleaving delay in micro seconds between 2 readings WMP/NK in a WMP+NK config
    if the ACC calibration time is very long (20 or 30s), try to increase this delay up to 4000
@@ -173,16 +232,19 @@
    comment this line only if you don't plan to used a LCD */
 #define LCD_CONF
 
+/* To use an Eagle Tree Power Panel LCD for configuration, uncomment this line
+ White wire  to Ground
+ Red wire    to +5V VCC (or to the WMP power pin, if you prefer to reset everything on the bus when WMP resets)
+ Yellow wire to SDA - Pin A4 Mini Pro - Pin 20 Mega
+ Brown wire  to SCL - Pin A5 Mini Pro - Pin 21 Mega 
+ (Contribution by Danal) */
+//#define LCD_ETPP
+
 /* to use Cat's whisker TEXTSTAR LCD, uncomment following line.
    Pleae note this display needs a full 4 wire connection to (+5V, Gnd, RXD, TXD )
    Configure display as follows: 115K baud, and TTL levels for RXD and TXD, terminal mode
    NO rx / tx line reconfiguration, use natural pins */
 //#define LCD_TEXTSTAR
-/* keys to navigate the LCD menu (preset to TEXTSTAR key-depress codes)*/
-#define LCD_MENU_PREV 'a'
-#define LCD_MENU_NEXT 'c'
-#define LCD_VALUE_UP 'd'
-#define LCD_VALUE_DOWN 'b'
 
 /* motors will not spin when the throttle command is in low position
    this is an alternative method to stop immediately the motors */
@@ -203,6 +265,20 @@
 #define TRI_YAW_CONSTRAINT_MIN 1020
 #define TRI_YAW_CONSTRAINT_MAX 2000
 #define TRI_YAW_MIDDLE 1500
+
+/* Flying Wing: you can change change servo orientation and servo min/max values here */
+/* valid for all flight modes, even passThrough mode */
+/* need to setup servo directions here; no need to swap servos amongst channels at rx */ 
+#define PITCH_DIRECTION_L 1 // left servo - pitch orientation
+#define PITCH_DIRECTION_R -1  // right servo - pitch orientation (opposite sign to PITCH_DIRECTION_L, if servos are mounted in mirrored orientation)
+#define ROLL_DIRECTION_L 1 // left servo - roll orientation
+#define ROLL_DIRECTION_R 1  // right servo - roll orientation  (same sign as ROLL_DIRECTION_L, if servos are mounted in mirrored orientation)
+#define WING_LEFT_MID  1500 // left servo center pos. - use this for trim
+#define WING_RIGHT_MID 1500 // right servo center pos. - use this for trim
+#define WING_LEFT_MIN  1020 // limit servo travel range must be inside [1020;2000]
+#define WING_LEFT_MAX  2000 // limit servo travel range must be inside [1020;2000]
+#define WING_RIGHT_MIN 1020 // limit servo travel range must be inside [1020;2000]
+#define WING_RIGHT_MAX 2000 // limit servo travel range must be inside [1020;2000]
 
 /* enable monitoring of the power consumption from battery (think of mAh) */
 /* allows to set alarm value in GUI or via LCD */

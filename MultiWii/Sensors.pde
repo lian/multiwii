@@ -72,42 +72,34 @@ static uint32_t neutralizeTime = 0;
 // I2C general functions
 // ************************************************************************************************************
 
-// Mask prescaler bits : only 5 bits of TWSR defines the status of each I2C request
-#define TW_STATUS_MASK	(1<<TWS7) | (1<<TWS6) | (1<<TWS5) | (1<<TWS4) | (1<<TWS3)
-#define TW_STATUS       (TWSR & TW_STATUS_MASK)
-
 void i2c_init(void) {
   #if defined(INTERNAL_I2C_PULLUPS)
     I2C_PULLUPS_ENABLE
   #else
     I2C_PULLUPS_DISABLE
   #endif
-  TWSR = 0;        // no prescaler => prescaler = 1
-  TWBR = ((16000000L / I2C_SPEED) - 16) / 2; // change the I2C clock rate
-  TWCR = 1<<TWEN;  // enable twi module, no interrupt
+  TWSR = 0;                                    // no prescaler => prescaler = 1
+  TWBR = ((16000000L / I2C_SPEED) - 16) / 2;   // change the I2C clock rate
+  TWCR = 1<<TWEN;                              // enable twi module, no interrupt
 }
 
 void i2c_rep_start(uint8_t address) {
-  TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN) | (1<<TWSTO); // send REPEAT START condition
-  waitTransmissionI2C(); // wait until transmission completed
-  checkStatusI2C(); // check value of TWI Status Register
-  TWDR = address; // send device address
+  TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN) ; // send REPEAT START condition
+  waitTransmissionI2C();                       // wait until transmission completed
+  TWDR = address;                              // send device address
   TWCR = (1<<TWINT) | (1<<TWEN);
-  waitTransmissionI2C(); // wail until transmission completed
-  checkStatusI2C(); // check value of TWI Status Register
+  waitTransmissionI2C();                       // wail until transmission completed
 }
 
-void i2c_rep_stop(void) {
+void i2c_stop(void) {
   TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWSTO);
-  waitTransmissionI2C();
-  checkStatusI2C();
+  //  while(TWCR & (1<<TWSTO));                // <- can produce a blocking state with some WMP clones
 }
 
 void i2c_write(uint8_t data ) {	
-  TWDR = data; // send data to the previously addressed device
+  TWDR = data;                                 // send data to the previously addressed device
   TWCR = (1<<TWINT) | (1<<TWEN);
-  waitTransmissionI2C(); // wait until transmission completed
-  checkStatusI2C(); // check value of TWI Status Register
+  waitTransmissionI2C();
 }
 
 uint8_t i2c_readAck() {
@@ -119,30 +111,21 @@ uint8_t i2c_readAck() {
 uint8_t i2c_readNak(void) {
   TWCR = (1<<TWINT) | (1<<TWEN);
   waitTransmissionI2C();
-  return TWDR;
+  uint8_t r = TWDR;
+  i2c_stop();
+  return r;
 }
 
 void waitTransmissionI2C() {
-  uint8_t count = 255;
-  while (count-->0 && !(TWCR & (1<<TWINT)) );
-  if (count<2) { //we are in a blocking state => we don't insist
-    TWCR = 0;  //and we force a reset on TWINT register
-    neutralizeTime = micros(); //we take a timestamp here to neutralize the value during a short delay after the hard reset
-  }
-}
-
-void checkStatusI2C() {
-  if ( TW_STATUS  == 0xF8) { //TW_NO_INFO : this I2C error status indicates a wrong I2C communication.
-    // WMP does not respond anymore => we do a hard reset. I did not find another way to solve it. It takes only 13ms to reset and init to WMP or WMP+NK
-    TWCR = 0;
-    if (!GYRO) {
-      POWERPIN_OFF //switch OFF WMP
-      delay(1);  
-      POWERPIN_ON  //switch ON WMP
-      delay(10);
-      WMP_init(0);
+  uint16_t count = 255;
+  while (!(TWCR & (1<<TWINT))) {
+    count--;
+    if (count==0) {              //we are in a blocking state => we don't insist
+      TWCR = 0;                  //and we force a reset on TWINT register
+      neutralizeTime = micros(); //we take a timestamp here to neutralize the value during a short delay
+      i2c_errors_count++;
+      break;
     }
-    neutralizeTime = micros(); //we take a timestamp here to neutralize the WMP or WMP+NK values during a short delay after the hard reset
   }
 }
 
@@ -150,8 +133,8 @@ void i2c_getSixRawADC(uint8_t add, uint8_t reg) {
   i2c_rep_start(add);
   i2c_write(reg);         // Start multiple read at the reg register
   i2c_rep_start(add +1);  // I2C read direction => I2C address + 1
-  for(uint8_t i = 0; i < 5; i++) {
-    rawADC[i]=i2c_readAck();}
+  for(uint8_t i = 0; i < 5; i++)
+    rawADC[i]=i2c_readAck();
   rawADC[5]= i2c_readNak();
 }
 
@@ -159,6 +142,7 @@ void i2c_writeReg(uint8_t add, uint8_t reg, uint8_t val) {
   i2c_rep_start(add+0);  // I2C write direction
   i2c_write(reg);        // register selection
   i2c_write(val);        // value to write in register
+  i2c_stop();
 }
 
 uint8_t i2c_readReg(uint8_t add, uint8_t reg) {
@@ -297,6 +281,7 @@ void i2c_BMP085_UT_Start() {
   i2c_writeReg(BMP085_ADDRESS,0xf4,0x2e);
   i2c_rep_start(BMP085_ADDRESS + 0);
   i2c_write(0xF6);
+  i2c_stop();
 }
 
 // read uncompensated pressure value: send command first
@@ -304,6 +289,7 @@ void i2c_BMP085_UP_Start () {
   i2c_writeReg(BMP085_ADDRESS,0xf4,0x34+(OSS<<6)); // control register value for oversampling setting 3
   i2c_rep_start(BMP085_ADDRESS + 0); //I2C write direction => 0
   i2c_write(0xF6);
+  i2c_stop();
 }
 
 // read uncompensated pressure value: read result bytes
@@ -370,9 +356,8 @@ void Baro_update() {
     case 3: 
       i2c_BMP085_UP_Read(); 
       i2c_BMP085_Calculate(); 
-      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 44330.0f;
-      bmp085_ctx.state = 0;
-      bmp085_ctx.deadline += 20000; 
+      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f;
+      bmp085_ctx.state = 0; bmp085_ctx.deadline += 20000; 
       break;
   } 
 }
@@ -439,12 +424,14 @@ void  Baro_init() {
 void i2c_MS561101BA_UT_Start() {
   i2c_rep_start(MS561101BA_ADDRESS+0);      // I2C write direction
   i2c_write(MS561101BA_TEMPERATURE + OSR);  // register selection
+  i2c_stop();
 }
 
 // read uncompensated pressure value: send command first
 void i2c_MS561101BA_UP_Start () {
   i2c_rep_start(MS561101BA_ADDRESS+0);      // I2C write direction
   i2c_write(MS561101BA_PRESSURE + OSR);     // register selection
+  i2c_stop();
 }
 
 // read uncompensated pressure value: read result bytes
@@ -494,12 +481,13 @@ void Baro_update() {
     case 3: 
       i2c_MS561101BA_UP_Read();
       i2c_MS561101BA_Calculate();
-      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 44330.0f;
+      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f;
       ms561101ba_ctx.state = 0; ms561101ba_ctx.deadline += 30000;
       break;
   } 
 }
 #endif
+
 
 // ************************************************************************************************************
 // I2C Accelerometer ADXL345 
@@ -547,19 +535,23 @@ void ACC_getADC () {
 //
 // 0x20    bw_tcs:   |                                           bw<3:0> |                        tcs<3:0> |
 //                   |                                             150Hz |                 !!Calibration!! |
-//
-// 0x35 offset_lsb1: |                                     offset_x<3:0> |        range<2:0> |    smp_skip |
-//                   |                                   !!Calibration!! |                2g |     IRQ 1/T |
 // ************************************************************************************************************
 #if defined(BMA180)
 void ACC_init () {
   delay(10);
   //default range 2G: 1G = 4096 unit.
   i2c_writeReg(BMA180_ADDRESS,0x0D,1<<4); // register: ctrl_reg0  -- value: set bit ee_w to 1 to enable writing
+  delay(5);
   uint8_t control = i2c_readReg(BMA180_ADDRESS, 0x20);
   control = control & 0x0F; // register: bw_tcs reg: bits 4-7 to set bw -- value: set low pass filter to 10Hz (bits value = 0000xxxx)
-  delay(5);
-  i2c_writeReg(BMA180_ADDRESS, 0x20, control); 
+  control = control | 0x00; 
+  i2c_writeReg(BMA180_ADDRESS, 0x20, control);
+  delay(5); 
+  control = i2c_readReg(BMA180_ADDRESS, 0x30);
+  control = control & 0xFC; 
+  control = control | 0x02; 
+  i2c_writeReg(BMA180_ADDRESS, 0x30, control);
+  delay(5); 
   acc_1G = 512;
 }
 
@@ -638,7 +630,7 @@ void ACC_getADC() {
 
 // ************************************************************************
 // LIS3LV02 I2C Accelerometer
-//contribution from adver (http://wbb.multiwii.com/viewtopic.php?f=8&t=451)
+//contribution from adver (http://multiwii.com/forum/viewtopic.php?f=8&t=451)
 // ************************************************************************
 #if defined(LIS3LV02)
 #define LIS3A  0x3A // I2C adress: 0x3A (8bit)
@@ -659,7 +651,30 @@ void i2c_ACC_getADC(){
 }
 #endif
 
+// ************************************************************************************************************
+// I2C Accelerometer LSM303DLx
+// contribution from wektorx (http://www.multiwii.com/forum/viewtopic.php?f=8&t=863)
+// ************************************************************************************************************
+#if defined(LSM303DLx_ACC)
+void ACC_init () {
+  delay(10);
+  i2c_writeReg(0x30,0x20,0x27);
+  i2c_writeReg(0x30,0x23,0x30);
+  i2c_writeReg(0x30,0x21,0x00);
 
+  acc_1G = 256;
+}
+
+  void ACC_getADC () {
+  TWBR = ((16000000L / 400000L) - 16) / 2;
+  i2c_getSixRawADC(0x30,0xA8);
+
+  ACC_ORIENTATION( - ((rawADC[3]<<8) | rawADC[2])/16 ,
+                     ((rawADC[1]<<8) | rawADC[0])/16 ,
+                     ((rawADC[5]<<8) | rawADC[4])/16 );
+  ACC_Common();
+}
+#endif
 
 // ************************************************************************************************************
 // ADC ACC
@@ -748,8 +763,8 @@ void Mag_getADC() {
   static int16_t magZeroTempMin[3];
   static int16_t magZeroTempMax[3];
   uint8_t axis;
-  if ( (micros()-t )  < 100000 ) return; //each read is spaced by 100ms
-  t = micros();
+  if ( currentTime < t ) return; //each read is spaced by 100ms
+  t = currentTime + 100000;
   TWBR = ((16000000L / 400000L) - 16) / 2; // change the I2C clock rate to 400kHz
   Device_Mag_getADC();
   if (calibratingM == 1) {
@@ -762,7 +777,7 @@ void Mag_getADC() {
   magADC[YAW]   -= magZero[YAW];
   if (tCal != 0) {
     if ((t - tCal) < 30000000) { // 30s: you have 30s to turn the multi in all directions
-      LEDPIN_SWITCH
+      LEDPIN_TOGGLE;
       for(axis=0;axis<3;axis++) {
         if (magADC[axis] < magZeroTempMin[axis]) magZeroTempMin[axis] = magADC[axis];
         if (magADC[axis] > magZeroTempMax[axis]) magZeroTempMax[axis] = magADC[axis];
@@ -825,7 +840,6 @@ void Device_Mag_getADC() {
 }
 #endif
 
-
 #if !GYRO 
 // ************************************************************************************************************
 // I2C Wii Motion Plus + optional Nunchuk
@@ -833,27 +847,27 @@ void Device_Mag_getADC() {
 // I2C adress 1: 0xA6 (8bit)    0x53 (7bit)
 // I2C adress 2: 0xA4 (8bit)    0x52 (7bit)
 // ************************************************************************************************************
-void WMP_init(uint8_t d) {
-  delay(d);
+void WMP_init() {
+  delay(250);
   i2c_writeReg(0xA6, 0xF0, 0x55); // Initialize Extension
-  delay(d);
+  delay(250);
   i2c_writeReg(0xA6, 0xFE, 0x05); // Activate Nunchuck pass-through mode
-  delay(d);
-  if (d>0) {
-    // We need to set acc_1G for the Nunchuk beforehand; It's used in WMP_getRawADC() and ACC_Common()
-    // If a different accelerometer is used, it will be overwritten by its ACC_init() later.
-    acc_1G = 200;
-    uint8_t numberAccRead = 0;
-    // Read from WMP 100 times, this should return alternating WMP and Nunchuk data
-    for(uint8_t i=0;i<100;i++) {
-      delay(4);
-      if (WMP_getRawADC() == 0) numberAccRead++; // Count number of times we read from the Nunchuk extension
-    }
-    // If we got at least 25 Nunchuck reads, we assume the Nunchuk is present
-    if (numberAccRead>25)
-      nunchuk = 1;
-    delay(10);
+  delay(250);
+
+  // We need to set acc_1G for the Nunchuk beforehand; It's used in WMP_getRawADC() and ACC_Common()
+  // If a different accelerometer is used, it will be overwritten by its ACC_init() later.
+  acc_1G = 200;
+  acc_25deg = acc_1G * 0.423;
+  uint8_t numberAccRead = 0;
+  // Read from WMP 100 times, this should return alternating WMP and Nunchuk data
+  for(uint8_t i=0;i<100;i++) {
+    delay(4);
+    if (WMP_getRawADC() == 0) numberAccRead++; // Count number of times we read from the Nunchuk extension
   }
+  // If we got at least 25 Nunchuck reads, we assume the Nunchuk is present
+  if (numberAccRead>25)
+    nunchuk = 1;
+  delay(10);
 }
 
 uint8_t WMP_getRawADC() {
@@ -892,13 +906,13 @@ uint8_t WMP_getRawADC() {
 
 void initSensors() {
   delay(200);
-  POWERPIN_ON
+  POWERPIN_ON;
   delay(100);
   i2c_init();
   delay(100);
   if (GYRO) Gyro_init();
-  else WMP_init(250);
+  else WMP_init();
   if (BARO) Baro_init();
-  if (ACC) ACC_init();
+  if (ACC) {ACC_init();acc_25deg = acc_1G * 0.423;}
   if (MAG) Mag_init();
 }
