@@ -32,7 +32,7 @@
 //#define I2C_SPEED 400000L   //400kHz fast mode, it works only with some WMP clones
 
 //enable internal I2C pull ups
-#define INTERNAL_I2C_PULLUPS
+//#define INTERNAL_I2C_PULLUPS
 
 
 //****** advanced users settings   ****************************************
@@ -137,7 +137,7 @@
 //if you use independent sensors
 //leave it commented if you already checked a specific board above
 /* I2C gyroscope */
-//#define ITG3200
+#define ITG3200
 //#define L3G4200D
 
 /* I2C accelerometer */
@@ -503,8 +503,8 @@
 /* ===================================================================== */
 
 //if you want to change to orientation of individual sensor
-//#define ACC_ORIENTATION(X, Y, Z)  {accADC[ROLL]  =  Y; accADC[PITCH]  = -X; accADC[YAW]  = Z;}
-//#define GYRO_ORIENTATION(X, Y, Z) {gyroADC[ROLL] = -Y; gyroADC[PITCH] =  X; gyroADC[YAW] = Z;}
+#define ACC_ORIENTATION(X, Y, Z)  {accADC[ROLL]  =  -X; accADC[PITCH] = -Y; accADC[YAW]  = Z;}
+#define GYRO_ORIENTATION(X, Y, Z) {gyroADC[ROLL] =  Y; gyroADC[PITCH] = -X; gyroADC[YAW] = Z;}
 //#define MAG_ORIENTATION(X, Y, Z)  {magADC[ROLL]  = X; magADC[PITCH]  = Y; magADC[YAW]  = Z;}
 
  
