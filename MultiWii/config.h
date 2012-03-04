@@ -299,7 +299,7 @@
 
 /* In order to save space, it's possibile to desactivate the LCD configuration functions
    comment this line only if you don't plan to used a LCD */
-#define LCD_CONF
+//#define LCD_CONF
 /* to include setting the aux switches for AUX1 and AUX2 via LCD */
 //#define LCD_CONF_AUX_12
 /* to include setting the aux switches for AUX1, AUX2, AUX3 and AUX4 via LCD */
