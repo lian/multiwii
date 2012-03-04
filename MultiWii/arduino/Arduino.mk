@@ -1,5 +1,10 @@
 # version 2012-03-04 - lian
 #
+# - remove cygwin parts
+#
+#
+# version 2012-03-04 - lian
+#
 # - stolen from hamburger: http://code.google.com/p/multiwii/source/browse/branches/Hamburger/Arduino-Makefiles/
 # - ignore --relax linker argument to fix segfault
 # - adapt to use adruino files from ./arduino directory (include in this repo)
@@ -46,94 +51,25 @@
 # SUCH DAMAGE.
 #
 
-#
-# Build an Arduino sketch.
-#
-
 ################################################################################
 # Paths
-#
 
-#
 # Save the system type for later use.
-#
 SYSTYPE			:=	$(shell uname)
 
 # force LANG to C so awk works sanely on MacOS
 export LANG=C
 
-#
 # Locate the sketch sources based on the initial Makefile's path
-#
 SRCROOT			:=	$(realpath $(dir $(firstword $(MAKEFILE_LIST))))
-ifneq ($(findstring CYGWIN, $(SYSTYPE)),) 
-  # Workaround a $(realpath ) bug on cygwin
-  ifeq ($(SRCROOT),)
-    SRCROOT	:=	$(shell cygpath -m ${CURDIR})
-    $(warning your realpath function is not working)
-    $(warning > setting SRCROOT to $(SRCROOT))
-  endif
-  # Correct the directory backslashes on cygwin
-  ARDUINO		:=	$(subst \,/,$(ARDUINO))
-endif
 
-#
-# We need to know the location of the sketchbook.  If it hasn't been overridden,
-# try the parent of the current directory.  If there is no libraries directory
-# there, assume that we are in a library's examples directory and try backing up
-# further.
-#
-ifeq ($(SKETCHBOOK),)
-  SKETCHBOOK		:=	$(shell cd $(SRCROOT)/.. && pwd)
-  ifeq ($(wildcard $(SKETCHBOOK)/libraries),)
-    SKETCHBOOK		:=	$(shell cd $(SRCROOT)/../.. && pwd)
-  endif
-  ifeq ($(wildcard $(SKETCHBOOK)/libraries),)
-    SKETCHBOOK		:=	$(shell cd $(SRCROOT)/../../.. && pwd)
-  endif
-  ifeq ($(wildcard $(SKETCHBOOK)/libraries),)
-    SKETCHBOOK		:=	$(shell cd $(SRCROOT)/../../../.. && pwd)
-  endif
-  ifeq ($(wildcard $(SKETCHBOOK)/libraries),)
-    $(error ERROR: cannot determine sketchbook location - please specify on the commandline with SKETCHBOOK=<path>)
-  endif
-else
-  ifeq ($(wildcard $(SKETCHBOOK)/libraries),)
-    #$(warning WARNING: sketchbook directory $(SKETCHBOOK) contains no libraries)
-  endif
-endif
-ifneq ($(findstring CYGWIN, $(SYSTYPE)),) 
-	# Convert cygwin path into a windows normal path
-    SKETCHBOOK	:=	$(shell cygpath -d ${SKETCHBOOK})
-    SKETCHBOOK	:=	$(subst \,/,$(SKETCHBOOK))
-endif
-
-#
 # Work out the sketch name from the name of the source directory.
-#
 SKETCH			:=	$(lastword $(subst /, ,$(SRCROOT)))
-# Workaround a $(lastword ) bug on cygwin
-ifeq ($(SKETCH),)
-  WORDLIST		:=	$(subst /, ,$(SRCROOT))
-  SKETCH		:=	$(word $(words $(WORDLIST)),$(WORDLIST))
-endif
 
-#
 # Work out where we are going to be building things
-#
 TMPDIR			?=	/tmp
 BUILDROOT		:=	$(abspath $(TMPDIR)/$(SKETCH).build)
-ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
-  # Workaround a $(abspath ) bug on cygwin
-  ifeq ($(BUILDROOT),)
-    BUILDROOT	:=	C:$(TMPDIR)/$(SKETCH).build
-    $(warning your abspath function is not working)
-    $(warning > setting BUILDROOT to $(BUILDROOT))
-  endif
-endif
 
-# Jump over the next makefile sections when runing a "make configure"
-ifneq ($(MAKECMDGOALS),configure)
 
 ################################################################################
 # Config options
@@ -154,7 +90,6 @@ endif
 # Find Arduino, if not explicitly specified
 #
 ifeq ($(ARDUINO),)
-
   #
   # List locations that might be valid ARDUINO settings
   #
@@ -172,23 +107,6 @@ ifeq ($(ARDUINO),)
     ARDUINOS		:=	$(wildcard $(ARDUINO_SEARCHPATH))
   endif
 
-  ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
-	# Most of the following commands are simply to deal with whitespaces in the path
-	# Read the "Program Files" system directory from the windows registry
-	PROGRAM_FILES		:=	$(shell cat /proc/registry/HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/ProgramFilesDir)
-	# Convert the path delimiters to /
-	PROGRAM_FILES		:=	$(shell cygpath -m ${PROGRAM_FILES})
-	# Escape the space with a backslash
-	PROGRAM_FILES		:=	$(shell echo $(PROGRAM_FILES) | sed s/\ /\\\\\ / )
-	# Use DOS paths because they do not contain spaces
-	PROGRAM_FILES		:=	$(shell cygpath -d ${PROGRAM_FILES})
-	# Convert the path delimiters to /
-	PROGRAM_FILES	:=	$(subst \,/,$(PROGRAM_FILES))
-	# Search for an Arduino instalation in a couple of paths
-	ARDUINO_SEARCHPATH	:=	c:/arduino* $(PROGRAM_FILES)/arduino*
-    ARDUINOS		:=	$(wildcard $(ARDUINO_SEARCHPATH))
-  endif
-
   #
   # Pick the first option if more than one candidate is found.
   #
@@ -200,7 +118,6 @@ ifeq ($(ARDUINO),)
   ifneq ($(words $(ARDUINOS)),1)
     $(warning WARNING: More than one copy of Arduino was found, using $(ARDUINO))
   endif
-
 endif
 
 ################################################################################
@@ -220,15 +137,8 @@ ifeq ($(SYSTYPE),Linux)
   # expect that tools are on the path
   TOOLPATH		:=	$(subst :, ,$(PATH))
 endif
-ifeq ($(findstring CYGWIN, $(SYSTYPE)),CYGWIN) 
-  TOOLPATH		:=	$(ARDUINO)/hardware/tools/avr/bin
-endif
 
-ifeq ($(findstring CYGWIN, $(SYSTYPE)),) 
 FIND_TOOL		=	$(firstword $(wildcard $(addsuffix /$(1),$(TOOLPATH))))
-else
-FIND_TOOL		=	$(firstword $(wildcard $(addsuffix /$(1).exe,$(TOOLPATH))))
-endif
 CXX			:=	$(call FIND_TOOL,avr-g++)
 CC			:=	$(call FIND_TOOL,avr-gcc)
 AS			:=	$(call FIND_TOOL,avr-gcc)
@@ -361,26 +271,6 @@ LIBOBJS			:=	$(SKETCHLIBOBJS) $(ARDUINOLIBOBJS)
 # *duino core
 #
 
-# Pull the Arduino version from the revisions.txt file
-#
-ifeq ($(ARDUINO_VERS),)
-# XXX can we count on this?  If not, what?
-ARDUINO_VERS	:=	$(shell expr `head -1 $(ARDUINO)/revisions.txt | cut -d ' ' -f 2`)
-# If the version is not a number, try it again, using another file
-ifneq ($(ARDUINO_VERS),$(shell echo $(ARDUINO_VERS) | sed 's/[^0-9]*//g'))
-	ARDUINO_VERS	:=	$(shell expr `head -1 $(ARDUINO)/lib/version.txt | cut -d ' ' -f 2`)
-endif
-ifneq ($(ARDUINO_VERS),$(shell echo $(ARDUINO_VERS) | sed 's/[^0-9]*//g'))
-	$(warning Could not determine Arduino version)
-endif
-endif
-
-# Find the hardware directory to use
-ifeq ($(ARDUINO_VERS),)
-HARDWARE_DIR		:=	$(firstword $(wildcard $(SKETCHBOOK)/hardware/$(HARDWARE) \
-							$(ARDUINO)/hardware/$(HARDWARE)))
-endif
-
 ifeq ($(HARDWARE_DIR),)
 $(error ERROR: hardware directory for $(HARDWARE) not found)
 endif
@@ -449,7 +339,6 @@ ALLOBJS			=	$(SKETCHOBJS) $(LIBOBJS) $(CORELIBOBJS)
 
 # All of the dependency files that may be generated
 ALLDEPS			=	$(ALLOBJS:%.o=%.d)
-endif
 
 ################################################################################
 # Targets
@@ -461,34 +350,13 @@ all:	$(SKETCHELF) $(SKETCHEEP) $(SKETCHHEX)
 upload: $(SKETCHHEX)
 	$(AVRDUDE) $(AVRDUDECONFIG) -c $(UPLOAD_PROTOCOL) -p $(MCU) -P $(PORT) -b$(UPLOAD_SPEED) -U flash:w:$(SKETCHHEX):i
 
-configure:
-	$(warning WARNING - A $(SKETCHBOOK)/config.mk file has been written)
-	$(warning Please edit the file to match your system configuration, if you use a different board or port)
-	@echo \# Select \'mega\' for the original APM, or \'mega2560\' for the V2 APM. > $(SKETCHBOOK)/config.mk
-	@echo BOARD=mega2560     >> $(SKETCHBOOK)/config.mk
-	@echo \# The communication port used to communicate with the APM. >> $(SKETCHBOOK)/config.mk
-ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
-	@echo PORT=com3 >> $(SKETCHBOOK)/config.mk
-else
-	@echo PORT=/dev/ttyUSB0 >> $(SKETCHBOOK)/config.mk
-endif
-
-debug:
-	$(AVARICE) --mkII --capture --jtag usb :4242 & \
-	gnome-terminal -x $(GDB) $(SKETCHELF) & \
-	echo -e '\n\nat the gdb prompt type "target remote localhost:4242"'
-
 # this allows you to flash your image via JTAG for when you
 # have completely broken your USB
 jtag-program:
 	$(AVARICE) --mkII --jtag usb --erase --program --file $(SKETCHELF)
 
 clean:
-ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
-	@del /S $(BUILDROOT)
-else
 	@rm -fr $(BUILDROOT)
-endif
 
 size:	$(SKETCHELF)
 	$(AVRSIZE) -C $(SKETCHELF)
@@ -563,22 +431,6 @@ $(BUILDROOT)/libraries/%.o: $(SKETCHBOOK)/libraries/%.S
 	$(RULEHDR)
 	$(v)$(AS) $(ASFLAGS) -c -o $@ $< $(SLIB_INCLUDES)
 
-#
-# Build library objects from Ardiuno library sources
-#
-ALIB_INCLUDES	=	-I$(dir $<)/utility $(ARDUINOLIBINCLUDES) $(COREINCLUDES)
-
-$(BUILDROOT)/libraries/%.o: $(ARDUINO)/libraries/%.cpp
-	$(RULEHDR)
-	$(v)$(CXX) $(CXXFLAGS) -c -o $@ $< $(ALIB_INCLUDES)
-
-$(BUILDROOT)/libraries/%.o: $(ARDUINO)/libraries/%.c
-	$(RULEHDR)
-	$(v)$(CC) $(CFLAGS) -c -o $@ $< $(ALIB_INCLUDES)
-
-$(BUILDROOT)/libraries/%.o: $(ARDUINO)/libraries/%.S
-	$(RULEHDR)
-	$(v)$(AS) $(ASFLAGS) -c -o $@ $< $(ALIB_INCLUDES)
 
 #
 # Build objects from the hardware core
