@@ -68,7 +68,11 @@ SKETCH			:=	$(lastword $(subst /, ,$(SRCROOT)))
 
 # Work out where we are going to be building things
 TMPDIR			?=	/tmp
-BUILDROOT		:=	$(abspath $(TMPDIR)/$(SKETCH).build)
+BUILDROOT		?=	$(abspath $(TMPDIR)/$(SKETCH).build)
+
+# Arduino Version
+ARDUINO_VERS		?=	100
+
 
 
 ################################################################################
@@ -128,10 +132,11 @@ endif
 # Decide where we are going to look for tools
 #
 ifeq ($(SYSTYPE),Darwin)
-  # use the tools that come with Arduino
-  TOOLPATH		:=	$(ARDUINOS)/hardware/tools/avr/bin
+  # ignore tools that come with Arduino, because we don't depend on it.
+  #TOOLPATH		:=	$(ARDUINOS)/hardware/tools/avr/bin
+  TOOLPATH		:=	$(subst :, ,$(PATH))
   # use BWK awk
-  AWK			=	awk
+  #AWK			=	awk
 endif
 ifeq ($(SYSTYPE),Linux)
   # expect that tools are on the path
