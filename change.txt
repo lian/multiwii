@@ -1,3 +1,10 @@
+change in 2.0 preversion 3:
+  - MAG calibration offset, small code correction
+  - new MAG device: MAG3110
+  - SERIAL RX Buffer size => 256 (64 was too short for 10Hz SERIAL GPS)
+  - MIS OSD update with an update of GPS code to grab GPS speed, GPS alt (GPRMC frame), and GPS coord via Serial
+  - ALLINONE board BMA180 address correction
+
 1.8 -> 1.9
     - some factorizations between PPM sum receiver code & standard receiver code
     - EXPERIMENTAL: integration of direct SBUS receiver thanks to the contribution of Captain IxI & Zaggo
@@ -603,4 +610,4 @@ GUI: better PITCH/ROLL representation and representation of the model inclinatio
 GUI: support of TRI, QUAD+ and QUADX, automatically recognized 
 GUI: ACC graph enabled by default 
 Site: partially updated, but the main part is ok
-The stabilization WMP and NK+WMP is not different from the previous version. 
+The stabilization WMP and NK+WMP is not different from the previous version.
