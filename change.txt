@@ -1,4 +1,10 @@
-change in 2.0 preversion 3:
+2.0 preversion3 -> 2.0 preversion4
+
+  - UART RX buffer definition moved to the begining of the Serial.pde (needed for promicro)
+  - MAG3110 added in order to activate #define MAG
+  - RCAUXPIN error correction (pullups was undefined)
+
+1.9 -> 2.0 preversion 3:
   - MAG calibration offset, small code correction
   - new MAG device: MAG3110
   - SERIAL RX Buffer size => 256 (64 was too short for 10Hz SERIAL GPS)
