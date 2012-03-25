@@ -1,15 +1,299 @@
-2.0 preversion3 -> 2.0 preversion4
+1.9 -> 2.0
 
-  - UART RX buffer definition moved to the begining of the Serial.pde (needed for promicro)
-  - MAG3110 added in order to activate #define MAG
-  - RCAUXPIN error correction (pullups was undefined)
+***you need at least Arduino 1.0 IDE to open the .ino file***
 
-1.9 -> 2.0 preversion 3:
-  - MAG calibration offset, small code correction
-  - new MAG device: MAG3110
-  - SERIAL RX Buffer size => 256 (64 was too short for 10Hz SERIAL GPS)
-  - MIS OSD update with an update of GPS code to grab GPS speed, GPS alt (GPRMC frame), and GPS coord via Serial
-  - ALLINONE board BMA180 address correction
+Board and sensors:
+New sensor:
+  ACC MMA7544 Accelerometer. 
+  MAG MAG3110 
+
+New boards:
+  CRIUS_SE
+  CRIUS_LIGHT
+  MONGOOSE
+  CHERRY6DOFv1_0
+  DROTEK_6DOF_MPU
+
+A new processor
+  Coded by ronco based on ATMega 32U4, which can be seen
+  as an intermediate proc between 328 and 2560, allowing
+  many improvements over the 328 with nearly the same size.
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=1145
+
+
+
+STM32 port
+  A nice initiative from dongs to port multiwii to a 32bit processor.
+  This code allows also to reuse some cheap FC boards and replace the
+  firmware by a multiwii one. (boards like FreeFlight FC that can be
+  found on goodluckbuy site, or specific boards designed by dongs like AfroFlight32)
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=1193
+  http://code.google.com/p/afrodevices/
+
+
+
+Stable mode
+  BMA180 and BMA020 settings are now set to 8G.
+  The settings were formerly 2G. We noticed vibrations could cause ACC saturation
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=849
+  , causing a wrong ACC measurement, and causing a wrong PITCH/ROLL angle deduction.
+  This problem was probably the main cause of the “level drift” problem.
+  => level mode should be much better now with those sensors.
+  One consequence: TRUSTED ACC is now enabled by default and will probably
+  be removed in future versions.
+
+  The term D of the PID LEVEL settings is now used to limit the effect
+  of the level correction thanks to the suggestion of Shikra
+   (see http://www.multiwii.com/forum/viewtopic.php?f=7&t=905 ).
+  By default (D=100), the behaviour of the stable mode is unchanged.
+  With a lower D, effects are:
+   - a smoothing level change
+   - should prevent some wobbles of death
+
+
+
+Altitude hold mode:
+  There was a lot of hit and miss about this functionality.
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=562 
+  http://www.multiwii.com/forum/viewtopic.php?f=7&t=363 
+
+  Things are not perfect, but thanks to Marcin we can see a huge
+  improvement and a working alt hold with default settings *on most setups*
+  There are still some oddities to solve.
+
+  ***Velocity PID is not currently used in the code***
+
+
+
+GPS mode:
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=649
+
+  There are now 2 GPS devices supported:
+  
+  Serial GPS
+   which should be connected on a free Serial port of the FC (MEGA boards needed)
+   Must be defined in config.h
+   #define GPS_SERIAL 2 < - a free serial port
+   #define GPS_BAUD 115200
+
+   GPS POSITION HOLD and GPS RETURN to HOME are both implemented with the Serial GPS option.
+
+  I2C Serial boards
+   EOSBandi did some code to add “a specific arduino + a Serial GPS” which
+   communicates with multiwii via I2C.
+   http://code.google.com/p/i2c-gps-nav/
+   Must be defined in config.h
+   #define I2C_GPS
+
+  Position of the Home is defined once the GPS receives at least 4 satellites.
+  Then there are 2 GPS mode:
+   -ReturnToHome: when activated, the multi will go back to the GPS Home GPS coordinates.
+   -PositionHold: when activated, the multi will stay at its position.
+
+  The GPS mode needs:
+   -a very well calibrated MAG which is not disturbed by running motors.
+    (no current of magnetic fields influence on the MAG, otherwise,
+    the GPS won’t work fine)
+   -an ACC correctly tuned for level stabilization
+
+  The principle is very simple for the moment: multiwii tries to lean
+  the multi in the direction of the target point, with an angle which
+  is proportional to the distance.
+  A PID setting was added in the GUI:
+   P = angle inclination proportional to target distance
+    with P=5.0 in the GUI , 1 meter = 0.5deg inclination
+   I is currently not used
+   D = max angle inclination due to the GPS correction (15 is fine to begin)
+
+
+  Nice vids with first working GPS here:
+   EOSBandi: http://www.youtube.com/watch?v=pJJKG6uWqv4
+   nhadrian: http://www.youtube.com/watch?v=YcLJfC4h90M
+
+
+
+More motors/more servos/better output accuracy:
+
+  Thanks to ronco, the output.pde part was nearly rewritten from scratch.
+  We have now new possible combinations that were impossible before.
+
+  Better efficiency for hardware pwm: digitalWrite arduino function was
+  removed in order to address directly the output ports.
+  One consequence: motor order is no more easily configurable.
+
+  On MEGA boards: the first 6 motors are now driven by timers configured
+  in a 16 bit mode.
+  The difference is noticeable in flight for a quad.
+  It's a really nice improvement for MEGA boards running a quad for instance.
+
+  Extended motor range option (for use with wii-ESC; resolution 250 steps vs. 125 steps std.)
+  see http://www.multiwii.com/forum/viewtopic.php?f=13&t=516 for more info
+
+
+  On 328p based board (promini): we can now have the following configurations:
+   HEX (FLAT X, FLAT +, or Y6)
+    - with a standard receiver: in this case the 2 last motors are
+      on PIN A0/A1 instead of D5&D6
+    - or still with a PPM SUM receiver
+    - with 2 servos for a GIMBAL mode + 1 servo for CAM TRIG:
+     - with a PPM sum receiver: in this case, the 2 last motors are
+       on PIN D5&D6 and the servos are on PIN A0/A1/A2
+     - with a standard receiver: in this case, the 2 last motors are
+       on PIN A0/A1 and the servos are on PIN A2/D12 (no CAM trig here)
+
+   OCTO config (FLAT X, FLAT +, X8):
+    - with or without a standard receiver: on PINs 3,9,10,11,A0,A1,A2,12
+    - no servos
+
+  Config schemes are documented here:
+  http://www.multiwii.com/connecting-elements
+
+
+
+New config:
+  - Flying wing was introduced as beta, and is now successfully tested:
+    http://www.multiwii.com/forum/viewtopic.php?f=8&t=594
+  - VTAIL
+
+
+
+LCD
+  The current supported LCD are now:
+   - LCD_SERIAL_3W: Alex' initial variant with 3 wires serial
+     LCD from Sparkfun, using rx-pin for transmission @9600 baud fixed
+   - LCD_TEXTSTAR: Cat's Whisker LCD_TEXTSTAR Module CW-LCD-02
+     (Which has 4 input keys for selecting menus)
+   - LCD_VT100: vt100 compatible terminal emulation (blueterm, putty, etc.)
+     alternate GUI to any (vt-100 aware) terminal program (optionally over BT),
+     works for most tablets, smartphones, etc.
+     http://www.multiwii.com/forum/viewtopic.php?f=7&t=1096
+   - LCD_ETPP: Eagle Tree Power Panel LCD, which is a i2c device (not serial)
+   - LCD_LCD03: LCD03, which is a i2c device
+     http://www.multiwii.com/forum/viewtopic.php?f=8&t=1094
+
+  - servo midpoints (default 1500) user configurable via LCD
+    (like subtrim on computer TX) for Flying Wing and TRI
+
+
+
+LED
+  An I2C LED Ring device with 12 RBG LEDs is integrated as an option
+  in multiwii to give more feedback about sensor states.
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=902
+  http://www.dailymotion.com/video/xmdqa9_ledringmultiwii_tech
+
+
+
+HeadFree mode
+  Something similar to MK Carefree mode was added.
+  Firstly introduced by mahowik as a “simple mode”
+  http://www.multiwii.com/forum/viewtopic.php?f=7&t=925
+  A specific check box was added in the GUI to activate this mode via a switch.
+  You need to have a magnetometer and accelerometer on the board
+  Principle: The head/front will be remembered when you turn on the engines.
+    So it means that you can   turn on/off the mode during the flight.
+
+
+
+Pass-through mode
+  It’s a checkbox in the GUI.
+  The purpose is to bypass the IMU for some configs like flying wings.
+
+
+
+Beeper mode
+  It’s a checkbox in the GUI.
+  The purpose is to activate a beeper in case you have a buzzer
+  installed and you lost your multi in high grass for instance.
+
+
+
+New stick combo
+  for magneto calibration (throttle=up yaw=right pitch=down)
+
+
+
+Better magnetometer calibration
+  The calibration of the magnetometer is now more precise,
+  because it takes into account the relative strength of the magnitude
+  projection on each axis.
+  Based on a code suggested by EOSBandi:
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=1068
+
+  It should improve the GPS return to target point accuracy.
+
+
+
+Gyro smoothing
+  There are 2 options to smooth the gyros: (mainly useful for fixed wings configs)
+   - per axis based on a LPF: #define GYRO_SMOOTHING {20, 20, 3}
+     // separate averaging ranges for roll, pitch, yaw
+   - for all axis, based on a moving average (from Magnetron)
+     #define MMGYRO
+     #define MMGYROVECTORLENGHT 10 
+
+  Servo gimbal smoothing is also an option based on the same principle:
+     #define MMSERVOGIMBAL
+     #define MMSERVOGIMBALVECTORLENGHT 32
+
+
+
+Inflight ACC-calibration:
+  It’s a way to calibrate the level via on flight tests.
+  Must be defined in config.h
+  #define InflightAccCalibration
+
+  Suggested by jevermeister
+  http://www.multiwii.com/forum/viewtopic.php?f=7&t=893
+
+
+
+Coding specific improvements:
+  Less RAM memory usage via the use of PROGMEM statement
+
+  No more Arduino Serial function => the new serial communication is more efficient
+
+  Board and sensors orientation:
+   This was something that was not well coded at the beginning.
+   http://www.multiwii.com/forum/viewtopic.php?f=8&t=1259
+   This mod should not affect board definition (a remapping of axis was done)
+   About individual sensor orientation: is not the same and it’s normal,
+   there is no bug to correct here.
+
+  task state in the main loop to reduce the jitter time loop
+
+
+
+GUI
+  I2C errors status display in the GUI
+
+  New AUX3/AUX4 checkboxes.
+  We can now have many more possibilities to activate/deactivate
+  a specific function (4 switch with 3 states assuming you have a 8 channels RC system)
+  The previous CAM1/CAM2 rc channels (that are now AUX3/AUX4) are still usable
+   for an assisted   PITCH/ROLL gimbal system if the AUX3/AUX4 checkboxes are not used.
+
+  visual feedback on state of all of the auxN options
+
+  GUI reports the full MWC firmware version number
+
+  And of course, there is the nice version of WinGUI from EOSBandi
+  It is definitively more friendly than the java one,
+  allowing more features like load/write configs.
+  http://www.multiwii.com/forum/viewtopic.php?f=8&t=1229
+
+
+
+OSD
+  rushduino is basically an arduino board, with OSD capabilities.
+   It's a very flexible solution, as it is open source,
+   and it plugs on the multiwii serial port to retrieve sensors info.
+   http://www.multiwii.com/forum/viewtopic.php?f=8&t=922
+
+  MIS OSD is also updated so that multiwii can also take GPS info from the OSD,
+   or the OSD can take GPS info from multiwii
+
+
 
 1.8 -> 1.9
     - some factorizations between PPM sum receiver code & standard receiver code
