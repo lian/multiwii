@@ -64,7 +64,10 @@ static uint8_t  passThruMode = 0;   // if passthrough mode is activated
 static int16_t  headFreeModeHold;
 static int16_t  gyroADC[3],accADC[3],accSmooth[3],magADC[3];
 static int16_t  accTrim[2] = {0, 0};
-static int16_t  heading,magHold;
+static int16_t  heading;
+#if MAG
+  static int16_t magHold;
+#endif
 static uint8_t  calibratedACC = 0;
 static uint8_t  vbat;               // battery voltage in 0.1V steps
 static uint8_t  okToArm = 0;
@@ -75,12 +78,14 @@ static int16_t  BaroPID = 0;
 static int32_t  AltHold;
 static int16_t  errorAltitudeI = 0;
 static uint8_t  buzzerState = 0;
-static int16_t  debug1,debug2,debug3,debug4;
+static int16_t  debug2,debug3,debug4; // debug1
   
-//for log
-static uint16_t cycleTimeMax = 0;       // highest ever cycle timen
-static uint16_t cycleTimeMin = 65535;   // lowest ever cycle timen
-static uint16_t powerMax = 0;           // highest ever current
+#ifdef LOG_VALUES
+  //for log
+  static uint16_t cycleTimeMax = 0;       // highest ever cycle timen
+  static uint16_t cycleTimeMin = 65535;   // lowest ever cycle timen
+  static uint16_t powerMax = 0;           // highest ever current
+#endif
 
 static int16_t  i2c_errors_count = 0;
 static int16_t  annex650_overrun_count = 0;
@@ -88,28 +93,34 @@ static int16_t  annex650_overrun_count = 0;
 // **********************
 //Automatic ACC Offset Calibration
 // **********************
-static uint16_t InflightcalibratingA = 0;
-static int16_t AccInflightCalibrationArmed;
-static uint16_t AccInflightCalibrationMeasurementDone = 0;
-static uint16_t AccInflightCalibrationSavetoEEProm = 0;
-static uint16_t AccInflightCalibrationActive = 0;
+#if defined(InflightAccCalibration)
+  static uint16_t InflightcalibratingA = 0;
+  static int16_t AccInflightCalibrationArmed;
+  static uint16_t AccInflightCalibrationMeasurementDone = 0;
+  static uint16_t AccInflightCalibrationSavetoEEProm = 0;
+  static uint16_t AccInflightCalibrationActive = 0;
+#endif
 
 // **********************
 // power meter
 // **********************
-#define PMOTOR_SUM 8                     // index into pMeter[] for sum
-static uint32_t pMeter[PMOTOR_SUM + 1];  // we use [0:7] for eight motors,one extra for sum
-static uint8_t pMeterV;                  // dummy to satisfy the paramStruct logic in ConfigurationLoop()
-static uint32_t pAlarm;                  // we scale the eeprom value from [0:255] to this value we can directly compare to the sum in pMeter[6]
+#if defined(POWERMETER)
+  #define PMOTOR_SUM 8                     // index into pMeter[] for sum
+  static uint32_t pMeter[PMOTOR_SUM + 1];  //we use [0:7] for eight motors,one extra for sum
+  static uint8_t pMeterV;                  // dummy to satisfy the paramStruct logic in ConfigurationLoop()
+  static uint32_t pAlarm;                  // we scale the eeprom value from [0:255] to this value we can directly compare to the sum in pMeter[6]
+  static uint16_t powerValue = 0;          // last known current
+#endif
 static uint8_t powerTrigger1 = 0;        // trigger for alarm based on power consumption
-static uint16_t powerValue = 0;          // last known current
 static uint16_t intPowerMeterSum, intPowerTrigger1;
 
 // **********************
 // telemetry
 // **********************
-static uint8_t telemetry = 0;
-static uint8_t telemetry_auto = 0;
+#if defined(LCD_CONF) && (defined(LCD_TELEMETRY) || defined(LCD_TELEMETRY_AUTO) || defined(LCD_TELEMETRY_DEBUG))
+  static uint8_t telemetry = 0;
+  static uint8_t telemetry_auto = 0;
+#endif
 
 // ******************
 // rc functions
@@ -143,15 +154,19 @@ static int8_t  smallAngle25 = 1;
 static int16_t axisPID[3];
 static int16_t motor[8];
 static int16_t servo[8] = {1500,1500,1500,1500,1500,1500,1500,1500};
-static uint16_t wing_left_mid  = WING_LEFT_MID; 
-static uint16_t wing_right_mid = WING_RIGHT_MID; 
-static uint16_t tri_yaw_middle = TRI_YAW_MIDDLE; 
+#if FLYING_WING
+  static uint16_t wing_left_mid  = WING_LEFT_MID;
+  static uint16_t wing_right_mid = WING_RIGHT_MID;
+#endif
+#ifdef TRI
+  static uint16_t tri_yaw_middle = TRI_YAW_MIDDLE;
+#endif
 
 // **********************
 // EEPROM & LCD functions
 // **********************
 static uint8_t P8[8], I8[8], D8[8]; // 8 bits is much faster and the code is much shorter
-static uint8_t dynP8[3], dynI8[3], dynD8[3];
+static uint8_t dynP8[3], dynD8[3];  // dynI8[3], 
 static uint8_t rollPitchRate;
 static uint8_t yawRate;
 static uint8_t dynThrPID;
@@ -161,16 +176,22 @@ static uint8_t activate2[CHECKBOXITEMS];
 // **********************
 // GPS
 // **********************
-static int32_t  GPS_latitude,GPS_longitude;
-static int32_t  GPS_latitude_home,GPS_longitude_home;
-static int32_t  GPS_latitude_hold,GPS_longitude_hold;
-static uint8_t  GPS_fix , GPS_fix_home = 0;
+#if GPS
+  static int32_t  GPS_latitude_home,GPS_longitude_home;
+  static int32_t  GPS_latitude_hold,GPS_longitude_hold;
+  static uint8_t  GPS_fix_home = 0;
+  static uint16_t GPS_distanceToHold;      // distance to home or hold point in meters
+  static int16_t  GPS_directionToHold;     // direction to home or hol point in degrees
+#endif
+static uint8_t  GPS_fix = 0;
 static uint8_t  GPS_numSat;
-static uint16_t GPS_distanceToHome,GPS_distanceToHold;       // distance to home or hold point in meters
-static int16_t  GPS_directionToHome,GPS_directionToHold;     // direction to home or hol point in degrees
-static uint16_t GPS_altitude,GPS_speed;                      // altitude in 0.1m and speed in 0.1m/s - Added by Mis
-static uint8_t  GPS_update = 0;                              // it's a binary toogle to distinct a GPS position update
-static int16_t  GPS_angle[2];                                // it's the angles that must be applied for GPS correction
+static int32_t  GPS_latitude,GPS_longitude;
+static uint16_t GPS_altitude,GPS_speed;    // altitude in 0.1m and speed in 0.1m/s - Added by Mis
+static uint16_t GPS_distanceToHome;
+static int16_t  GPS_directionToHome;
+static uint8_t  GPS_update = 0;          // it's a binary toogle to distinct a GPS position update
+static int16_t  GPS_angle[2];            // it's the angles that must be applied for GPS correction
+
 
 void blinkLED(uint8_t num, uint8_t wait,uint8_t repeat) {
   uint8_t i,r;
@@ -405,7 +426,9 @@ void loop () {
   static int16_t errorGyroI[3] = {0,0,0};
   static int16_t errorAngleI[2] = {0,0};
   static uint32_t rcTime  = 0;
-  static int16_t initialThrottleHold;
+  #if BARO
+    static int16_t initialThrottleHold;
+  #endif
 
   #if defined(SPEKTRUM)
     if (rcFrameComplete) computeRC();

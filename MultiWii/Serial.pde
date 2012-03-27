@@ -343,7 +343,7 @@ uint8_t SerialAvailable(uint8_t port) {
 void SerialWrite(uint8_t port,uint8_t c){
  switch (port) {
     case 0: serialize8(c);UartSendData(); break;                 // Serial0 TX is driven via a buffer and a background intterupt
-    #if defined(MEGA) || #defined(PROMICRO)
+    #if defined(MEGA) || defined(PROMICRO)
     case 1: while (!(UCSR1A & (1 << UDRE1))) ; UDR1 = c; break;  // Serial1 Serial2 and Serial3 TX are not driven via interrupts
     #endif
     #if defined(MEGA)
