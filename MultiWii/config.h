@@ -24,6 +24,7 @@
 //#define OCTOFLATX
 //#define FLYING_WING
 //#define VTAIL4
+//#define AIRPLANE     // Howto setup =>>>http://fotoflygarn.blogspot.com/2012/03/how-to-setup-multiwii-airplane-same.html
 
 #define YAW_DIRECTION 1 // if you want to reverse the yaw correction direction
 //#define YAW_DIRECTION -1
@@ -41,12 +42,8 @@
 /* I2C DFRobot LED RING communication */
 //#define LED_RING
 
-/* This option should be uncommented if ACC Z is accurate enough when motors are running*/
-/* should now be ok with BMA020 and BMA180 ACC */
-#define TRUSTED_ACCZ
-
 /* This will activate the ACC-Inflight calibration if unchecked */  
-//#define InflightAccCalibration
+//#define INFLIGHT_ACC_CALIBRATION
 
 /* PIN A0 and A1 instead of PIN D5 & D6 for 6 motors config and promini config
    This mod allow the use of a standard receiver on a pro mini
@@ -59,6 +56,7 @@
 */
 //#define RCAUXPIN8
 //#define RCAUXPIN12
+//#define RCOPTIONSBEEP        //uncomment this if you want the buzzer to beep at any rcOptions change on channel Aux1 to Aux4
 
 /* GPS using a SERIAL port
    only available on MEGA boards (this might be possible on 328 based boards in the future)
@@ -115,9 +113,11 @@
 //#define FREEIMUv035_BMP // FreeIMU v0.3.5_BMP
 //#define FREEIMUv04      // FreeIMU v0.4 with MPU6050, HMC5883L, MS561101BA                  <- confirmed by Alex
 //#define FREEIMUv043     // same as FREEIMUv04 with final MPU6050 (with the right ACC scale)
+//#define NANOWII         // the smallest multiwii FC based on MPU6050 + pro micro based proc <- confirmed by Alex
 //#define PIPO            // 9DOF board from erazz
 //#define QUADRINO        // full FC board 9DOF+baro board from witespy  with BMP085 baro     <- confirmed by Alex
-//#define QUADRINO_ZOOM   // full FC board 9DOF+baro board from witespy  second edition       <- confirmed by Alex
+//#define QUADRINO_ZOOM   // full FC board 9DOF+baro board from witespy  second edition
+//#define QUADRINO_ZOOM_MS    // full FC board 9DOF+baro board from witespy  second edition       <- confirmed by Alex
 //#define ALLINONE        // full FC board or standalone 9DOF+baro board from CSG_EU
 //#define AEROQUADSHIELDv2
 //#define ATAVRSBIN1      // Atmel 9DOF (Contribution by EOSBandi). requires 3.3V power.
@@ -130,15 +130,17 @@
 //#define DROTEK_10DOF_MS // Drotek 10DOF with ITG3200, BMA180, HMC5883, MS5611, LLC
 //#define DROTEK_6DOFv2   // Drotek 6DOF v2
 //#define DROTEK_6DOF_MPU // Drotek 6DOF with MPU6050
-//#define MONGOOSE1_0     // mongoose 1.0    http://www.fuzzydrone.org/
+//#define MONGOOSE1_0     // mongoose 1.0    http://store.ckdevices.com/
 //#define CRIUS_LITE      // Crius MultiWii Lite
 //#define CRIUS_SE        // Crius MultiWii SE
+//#define OPENLRSv2MULTI  // OpenLRS v2 Multi Rc Receiver board including ITG3205 and ADXL345
 
 //if you use independent sensors
 //leave it commented if you already checked a specific board above
 /* I2C gyroscope */
 //#define ITG3200
 //#define L3G4200D
+//#define MPU6050       //combo + ACC
 
 /* I2C accelerometer */
 //#define MMA745
@@ -158,6 +160,14 @@
 //#define HMC5883
 //#define AK8975
 //#define MAG3110
+
+// use the Devantech SRF i2c sensors, SRF08, SRF02
+// (for now, there is no difference in the SRF0x code, but we may want to differentiate in the future.)
+//#define SRF02
+//#define SRF08
+//#define SRF10
+//#define SRF23
+
 
 /* ADC accelerometer */ // for 5DOF from sparkfun, uses analog PIN A1/A2/A3
 //#define ADCACC
@@ -191,7 +201,7 @@
    Good results for helicopter, airplanes and flying wings (foamies) with lots of vibrations.*/
 //#define GYRO_SMOOTHING {20, 20, 3}    // separate averaging ranges for roll, pitch, yaw
 
-// Moving Average Gyros by Magnetron1 (Michele Ardito) ########## beta
+// Moving Average Gyros
 //#define MMGYRO                         // Active Moving Average Function for Gyros
 //#define MMGYROVECTORLENGHT 10          // Lenght of Moving Average Vector
 // Moving Average ServoGimbal Signal Output
@@ -246,21 +256,19 @@
      There is no 3.3V source on a pro mini; you can either use a different 3V source, or attach orange to 5V with a 3V regulator in-line (such as http://search.digikey.com/scripts/DkSearch/dksus.dll?Detail&name=MCP1700-3002E/TO-ND)
      If you use an inline-regulator, a standard 3-pin servo connector can connect to ground, +5V, and RX0; solder the correct wires (and the 3V regulator!) to a Spektrum baseRX-to-Sat cable that has been cut in half. 
      NOTE: Because there is only one serial port on the Pro Mini, using a Spektrum Satellite implies you CANNOT use the PC based configuration tool. Further, you cannot use on-aircraft serial LCD as the baud rates are incompatible. You can configure by one of two methods:
-       1) Use an on-aircraft i2c LCD (such as Eagle Tree or LCD03) for setting gains, reading sensors, etc. 
-       2) Available now: Comment out the Spektrum definition, upload, plug in PC, configure; uncomment the Spektrum definition, upload, plug in RX, and fly.  Repeat as required to configure. 
-   (Contribution by Danal) */
+       1) Use an on-aircraft i2c LCD (such as Eagle Tree or LCD03) for setting gains, reading sensors, etc.
+       2) Available now: Comment out the Spektrum definition, upload, plug in PC, configure; uncomment the Spektrum definition, upload, plug in RX, and fly.  Repeat as required to configure. */
 //#define SPEKTRUM 1024
 //#define SPEKTRUM 2048
 
 
 /* EXPERIMENTAL !!
-   contribution from Captain IxI and Zaggo
    cf http://www.multiwii.com/forum/viewtopic.php?f=7&t=289
    The following line apply only for Futaba S-Bus Receiver on MEGA boards at RX1 only (Serial 1).
    You have to invert the S-Bus-Serial Signal e.g. with a Hex-Inverter like IC SN74 LS 04 */
 //#define SBUS
 
-/* Failsave settings - added by MIS
+/* Failsave settings
    Failsafe check pulse on THROTTLE channel. If the pulse is OFF (on only THROTTLE or on all channels) the failsafe procedure is initiated.
    After FAILSAVE_DELAY time of pulse absence, the level mode is on (if ACC or nunchuk is avaliable), PITCH, ROLL and YAW is centered
    and THROTTLE is set to FAILSAVE_THR0TTLE value. You must set this value to descending about 1m/s or so for best results. 
@@ -268,17 +276,13 @@
    Next, afrer FAILSAVE_OFF_DELAY the copter is disarmed, and motors is stopped.
    If RC pulse coming back before reached FAILSAVE_OFF_DELAY time, after the small quard time the RC control is returned to normal.
    If you use serial sum PPM, the sum converter must completly turn off the PPM SUM pusles for this FailSafe functionality.*/
-#define FAILSAFE                                  // Alex: comment this line if you want to deactivate the failsafe function
+#define FAILSAFE                                  // comment this line if you want to deactivate the failsafe function
 #define FAILSAVE_DELAY     10                     // Guard time for failsafe activation after signal lost. 1 step = 0.1sec - 1sec in example
 #define FAILSAVE_OFF_DELAY 200                    // Time for Landing before motors stop in 0.1sec. 1 step = 0.1sec - 20sec in example
 #define FAILSAVE_THR0TTLE  (MINTHROTTLE + 200)    // Throttle level used for landing - may be relative to MINTHROTTLE - as in this case
 
-/* EXPERIMENTAL !!
-  contribution from Luis Correia
-  see http://www.multiwii.com/forum/viewtopic.php?f=18&t=828
-  It uses a Bluetooth Serial module as the input for controlling the device via an Android application
-  As with the SPEKTRUM option, is not possible to use the configuration tool on a mini or promini. */
-//#define BTSERIAL
+/* to input RC signal with the serial port */
+//#define RCSERIAL
 
 /* this is the value for the ESCs when they are not armed
    in some cases, this value must be lowered down to 900 for some specific ESCs */
@@ -292,28 +296,28 @@
 #define SERIAL_COM_SPEED 115200
 
 /********************************************************************/
-/****           LCD - display and telemetry settings             ****/
+/****           LCD - display settings                           ****/
 /********************************************************************/
 /* In order to save space, it's possibile to desactivate the LCD configuration functions
    comment this line only if you don't plan to used a LCD */
 //#define LCD_CONF
-/* to include setting the aux switches for AUX1 and AUX2 via LCD */
-//#define LCD_CONF_AUX_12
-/* to include setting the aux switches for AUX1, AUX2, AUX3 and AUX4 via LCD */
-//#define LCD_CONF_AUX_1234
-
+/* to include setting the aux switches for AUX1 -> AUX4 via LCD */ //to review (activate[] is now 16 bit long)
+//#define LCD_CONF_AUX
 
 /* choice of LCD attached for configuration and telemetry, see notes below */
 #define LCD_SERIAL3W    // Alex' initial variant with 3 wires, using rx-pin for transmission @9600 baud fixed
 /* serial (wired or wireless via BT etc.) */
 //#define LCD_TEXTSTAR    // Cat's Whisker LCD_TEXTSTAR Module CW-LCD-02 (Which has 4 input keys for selecting menus)
-//#define LCD_VT100               // vt100 compatible terminal emulation (blueterm, putty, etc.)
+//#define LCD_VT100       // vt100 compatible terminal emulation (blueterm, putty, etc.)
 /* i2c devices */
 //#define LCD_ETPP        // Eagle Tree Power Panel LCD, which is i2c (not serial)
 //#define LCD_LCD03       // LCD03, which is i2c
+//#define OLED_I2C_128x64 // OLED http://www.multiwii.com/forum/viewtopic.php?f=7&t=1350
+
+//#define NEW_OLED_FONT	// OLED use other font (more lines)
 
 /* style of display - autodetected by LCD_ setting - only activate to overwrite defaults */
-//#define DISPLAY_2LINES
+#define DISPLAY_2LINES
 //#define DISPLAY_MULTILINE
 
 /* keys to navigate the LCD menu (preset to LCD_TEXTSTAR key-depress codes)*/
@@ -328,15 +332,13 @@
  VCC to +5V VCC (pin1 from top)
  SDA - Pin A4 Mini Pro - Pin 20 Mega (pin2 from top)
  SCL - Pin A5 Mini Pro - Pin 21 Mega (pin3 from top)
- GND to Ground (pin4 from top)
- (by Th0rsten) */
+ GND to Ground (pin4 from top)*/
 
 /* To use an Eagle Tree Power Panel LCD for configuration:
  White wire  to Ground
  Red wire    to +5V VCC (or to the WMP power pin, if you prefer to reset everything on the bus when WMP resets)
  Yellow wire to SDA - Pin A4 Mini Pro - Pin 20 Mega
- Brown wire  to SCL - Pin A5 Mini Pro - Pin 21 Mega 
- (Contribution by Danal) */
+ Brown wire  to SCL - Pin A5 Mini Pro - Pin 21 Mega */
 
 /* Cat's whisker LCD_TEXTSTAR LCD
    Pleae note this display needs a full 4 wire connection to (+5V, Gnd, RXD, TXD )
@@ -367,6 +369,19 @@
 /* so we try do define a meaningful part. For a 3S battery we define full=12,6V and calculate how much it is above first warning level */
 /* Example: 12.6V - VBATLEVEL1_3S  (for me = 126 - 102 = 24) */
 #define VBATREF 24
+
+/* if program gets too large (>32k), need to exclude some functionality */
+/* uncomment to suppress some unwanted telemetry pages (only useful if telemetry is enabled) */
+//#define SUPPRESS_TELEMETRY_PAGE_1
+//#define SUPPRESS_TELEMETRY_PAGE_2
+//#define SUPPRESS_TELEMETRY_PAGE_3
+//#define SUPPRESS_TELEMETRY_PAGE_4
+//#define SUPPRESS_TELEMETRY_PAGE_5
+//#define SUPPRESS_TELEMETRY_PAGE_6
+//#define SUPPRESS_TELEMETRY_PAGE_7
+//#define SUPPRESS_TELEMETRY_PAGE_8
+//#define SUPPRESS_TELEMETRY_PAGE_9
+
 /********************************************************************/
 /****           motor, servo and other presets                   ****/
 /********************************************************************/
@@ -416,8 +431,19 @@
 #define WING_RIGHT_MIN 1020 // limit servo travel range must be inside [1020;2000]
 #define WING_RIGHT_MAX 2000 // limit servo travel range must be inside [1020;2000]
 
+//***********************************************************************************************//
+//******************************* !!!!  Airplane Settings  !!!! *********************************//
+//***********************************************************************************************//
+//Howto setup =>>> http://fotoflygarn.blogspot.com/2012/03/how-to-setup-multiwii-airplane-same.html
+//#define D12_POWER    // Use D12 on PROMINI to power sensors. Will disable servo[4] on D12 
+
+#define SERVO_OFFSET     {  0,   0,   0, -20,  40,   0,  20,   0 } // Servo MID Offset
+#define SERVO_RATES      {100, 100, 100, 100, 100, 100, 100, 100 } // Rates in 0-100% 
+#define SERVO_DIRECTION  {  1,   1,   1,   -1,  1,   1,   1,   1 } // Invert servos by setting -1 
+//*************************************************************************************************// 
+
 /********************************************************************/
-/****           powermeter                                       ****/
+/****           powermeter (battery capacity monitoring)         ****/
 /********************************************************************/
 
 /* enable monitoring of the power consumption from battery (think of mAh) */
@@ -467,7 +493,7 @@
 
 
 /********************************************************************/
-/****           diagnostics                                      ****/
+/****           battery voltage monitoring                       ****/
 /********************************************************************/
 
 /* for V BAT monitoring
@@ -480,6 +506,10 @@
 #define VBATLEVEL2_3S 103 // 10,3V
 #define VBATLEVEL3_3S 99  // 9.9V
 #define NO_VBAT       16 // Avoid beeping without any battery
+
+/********************************************************************/
+/****           diagnostics                                      ****/
+/********************************************************************/
 
 /* to log values like max loop time and others to come */
 /* logging values are visible via LCD config */

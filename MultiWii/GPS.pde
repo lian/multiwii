@@ -25,14 +25,17 @@ void GPS_NewData() {
           uint8_t *varptr = (uint8_t *)&GPS_distanceToHome;
           *varptr++ = i2c_readAck();
           *varptr   = i2c_readAck();
+
           varptr = (uint8_t *)&GPS_directionToHome;
           *varptr++ = i2c_readAck();
           *varptr   = i2c_readAck();
+
           varptr = (uint8_t *)&GPS_latitude;		// for OSD latitude displaying
           *varptr++ = i2c_readAck();
           *varptr++ = i2c_readAck();
           *varptr++ = i2c_readAck();
           *varptr   = i2c_readAck();
+
           varptr = (uint8_t *)&GPS_longitude;		// for OSD longitude displaying
           *varptr++ = i2c_readAck();
           *varptr++ = i2c_readAck();
@@ -42,23 +45,28 @@ void GPS_NewData() {
           i2c_rep_start(I2C_GPS_ADDRESS);
           i2c_write(I2C_GPS_GROUND_SPEED);          //Start read from here 2x2 bytes speed and altitude
           i2c_rep_start(I2C_GPS_ADDRESS+1);
+
           varptr = (uint8_t *)&GPS_speed;			// speed in cm/s for OSD
           *varptr++ = i2c_readAck();
           *varptr   = i2c_readAck();
+
           varptr = (uint8_t *)&GPS_altitude;       // altitude in meters for OSD
           *varptr++ = i2c_readAck();
           *varptr   = i2c_readNak();
+
+          //GPS_ground_course
+          i2c_rep_start(I2C_GPS_ADDRESS);
+          i2c_write(I2C_GPS_COURSE);             //0x9C
+          i2c_rep_start(I2C_GPS_ADDRESS+1);
+          
+          varptr = (uint8_t *)&GPS_ground_course;
+          *varptr++ = i2c_readAck();
+          *varptr   = i2c_readNak();
         }
-  
     } else {                                                                          //We don't have a fix zero out distance and bearing (for safety reasons)
       GPS_distanceToHome = 0;
       GPS_directionToHome = 0;
       GPS_numSat = 0;
-    }  
-
-    if (rcData[AUX4]>1800 || GPS_fix_home == 0) {
-      i2c_rep_start(I2C_GPS_ADDRESS);i2c_write(I2C_GPS_COMMAND);i2c_write(I2C_GPS_COMMAND_SET_WP);//Store current position to WP#0 (this is used for RTH)
-      i2c_rep_start(I2C_GPS_ADDRESS);i2c_write(I2C_GPS_COMMAND);i2c_write(I2C_GPS_COMMAND_ACTIVATE_WP);//Set WP#0 as the active WP
     }
   #endif     
 
@@ -96,6 +104,17 @@ void GPS_NewData() {
         }
         GPS_update = 0;
     }
+  #endif
+}
+
+void GPS_reset_home_position() {
+  #if defined(I2C_GPS)
+    //set current position as home
+    i2c_rep_start(I2C_GPS_ADDRESS);i2c_write(I2C_GPS_COMMAND);i2c_write(I2C_GPS_COMMAND_SET_WP);//Store current position to WP#0 (this is used for RTH)
+    i2c_rep_start(I2C_GPS_ADDRESS);i2c_write(I2C_GPS_COMMAND);i2c_write(I2C_GPS_COMMAND_ACTIVATE_WP);//Set WP#0 as the active WP
+  #else
+    GPS_latitude_home  = GPS_latitude;
+    GPS_longitude_home = GPS_longitude;
   #endif
 }
 

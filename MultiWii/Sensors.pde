@@ -269,11 +269,11 @@ void ACC_Common() {
       accZero[YAW]   = a[YAW]/400-acc_1G; // for nunchuk 200=1G
       accTrim[ROLL]   = 0;
       accTrim[PITCH]  = 0;
-      writeParams(); // write accZero in EEPROM
+      writeParams(1); // write accZero in EEPROM
     }
     calibratingA--;
   }
-  #if defined(InflightAccCalibration)
+  #if defined(INFLIGHT_ACC_CALIBRATION)
       static int32_t b[3];
       static int16_t accZero_saved[3]  = {0,0,0};
       static int16_t  accTrim_saved[2] = {0, 0};
@@ -299,7 +299,7 @@ void ACC_Common() {
         if (InflightcalibratingA == 1) {
           AccInflightCalibrationActive = 0;
           AccInflightCalibrationMeasurementDone = 1;
-          blinkLED(10,10,2);      //buzzer for indicatiing the start inflight
+          toggleBeep = 2;      //buzzer for indicatiing the end of calibration
         // recover saved values to maintain current flight behavior until new values are transferred
          accZero[ROLL]  = accZero_saved[ROLL] ;
          accZero[PITCH] = accZero_saved[PITCH];
@@ -317,7 +317,7 @@ void ACC_Common() {
         accZero[YAW]   = b[YAW]/50-acc_1G; // for nunchuk 200=1G
         accTrim[ROLL]   = 0;
         accTrim[PITCH]  = 0;
-        writeParams(); // write accZero in EEPROM
+        writeParams(1); // write accZero in EEPROM
       }
   #endif
   accADC[ROLL]  -=  accZero[ROLL] ;
@@ -477,8 +477,6 @@ void Baro_update() {
 // ************************************************************************************************************
 // I2C Barometer MS561101BA
 // ************************************************************************************************************
-// first contribution from Fabio
-// modification from Alex (September 2011)
 //
 // specs are here: http://www.meas-spec.com/downloads/MS5611-01BA03.pdf
 // useful info on pages 7 -> 12
@@ -672,11 +670,6 @@ void ACC_getADC () {
 #endif
 
 // ************************************************************************************************************
-// contribution initially from opie11 (rc-groups)
-// adaptation from C2po (may 2011)
-// contribution from ziss_dm (June 2011)
-// contribution from ToLuSe (Jully 2011)
-// contribution from Alex (December 2011)
 // I2C Accelerometer BMA180
 // ************************************************************************************************************
 // I2C adress: 0x80 (8bit)    0x40 (7bit) (SDO connection to VCC) 
@@ -728,9 +721,6 @@ void ACC_getADC () {
 #endif
 
 // ************************************************************************************************************
-// contribution from Point65 and mgros (rc-groups)
-// contribution from ziss_dm (June 2011)
-// contribution from ToLuSe (Jully 2011)
 // I2C Accelerometer BMA020
 // ************************************************************************************************************
 // I2C adress: 0x70 (8bit)
@@ -791,18 +781,17 @@ void ACC_getADC() {
 
 // ************************************************************************
 // LIS3LV02 I2C Accelerometer
-//contribution from adver (http://multiwii.com/forum/viewtopic.php?f=8&t=451)
 // ************************************************************************
 #if defined(LIS3LV02)
 #define LIS3A  0x3A // I2C adress: 0x3A (8bit)
 
-void i2c_ACC_init(){
+void ACC_init(){
   i2c_writeReg(LIS3A ,0x20 ,0xD7 ); // CTRL_REG1   1101 0111 Pwr on, 160Hz 
   i2c_writeReg(LIS3A ,0x21 ,0x50 ); // CTRL_REG2   0100 0000 Littl endian, 12 Bit, Boot
   acc_1G = 256;
 }
 
-void i2c_ACC_getADC(){
+void ACC_getADC(){
   TWBR = ((16000000L / 400000L) - 16) / 2; // change the I2C clock rate to 400kHz
   i2c_getSixRawADC(LIS3A,0x28+0x80);
   ACC_ORIENTATION( ((rawADC[1]<<8) | rawADC[0])/4 ,
@@ -814,7 +803,6 @@ void i2c_ACC_getADC(){
 
 // ************************************************************************************************************
 // I2C Accelerometer LSM303DLx
-// contribution from wektorx (http://www.multiwii.com/forum/viewtopic.php?f=8&t=863)
 // ************************************************************************************************************
 #if defined(LSM303DLx_ACC)
 void ACC_init () {
@@ -857,7 +845,6 @@ void ACC_getADC() {
 #endif
 
 // ************************************************************************************************************
-// contribution from Ciskje
 // I2C Gyroscope L3G4200D 
 // ************************************************************************************************************
 #if defined(L3G4200D)
@@ -959,7 +946,7 @@ void Mag_getADC() {
       tCal = 0;
       for(axis=0;axis<3;axis++)
         magZero[axis] = (magZeroTempMin[axis] + magZeroTempMax[axis])/2;
-      writeParams();
+      writeParams(1);
     }
   }
 }
@@ -1055,7 +1042,7 @@ void Device_Mag_getADC() {
 #endif
 
 // ************************************************************************************************************
-// I2C Compass AK8975 (Contribution by EOSBandi)
+// I2C Compass AK8975
 // ************************************************************************************************************
 // I2C adress: 0x18 (8bit)   0x0C (7bit)
 // ************************************************************************************************************
@@ -1114,10 +1101,10 @@ void ACC_init () {
   i2c_writeReg(MPU6050_ADDRESS, 0x1C, 0x10);             //ACCEL_CONFIG  -- AFS_SEL=2 (Full Scale = +/-8G)  ; ACCELL_HPF=0   //note something is wrong in the spec.
   //note: something seems to be wrong in the spec here. With AFS=2 1G = 4096 but according to my measurement: 1G=2048 (and 2048/8 = 256)
   //confirmed here: http://www.multiwii.com/forum/viewtopic.php?f=8&t=1080&start=10#p7480
-  #if defined(FREEIMUv043)
-    acc_1G = 512;
-  #else
+  #if defined(FREEIMUv04)
     acc_1G = 255;
+  #else
+    acc_1G = 512;
   #endif
 
   #if defined(MPU6050_EN_I2C_BYPASS)
@@ -1227,6 +1214,192 @@ uint8_t WMP_getRawADC() {
 }
 #endif
 
+
+// ************************************************************************************************************
+// I2C Sonar SRF08
+// ************************************************************************************************************
+// first contribution from guru_florida (02-25-2012)
+//
+// specs are here: http://www.meas-spec.com/downloads/MS5611-01BA03.pdf
+// useful info on pages 7 -> 12
+#if defined(SRF02) || defined(SRF08) || defined(SRF10) || defined(SRC235)
+
+// the default address for any new sensor found on the bus
+// the code will move new sonars to the next available sonar address in range of F0-FE so that another
+// sonar sensor can be added again.
+// Thus, add only 1 sonar sensor at a time, poweroff, then wire the next, power on, wait for flashing light and repeat
+#if !defined(SRF08_DEFAULT_ADDRESS) 
+  #define SRF08_DEFAULT_ADDRESS 0xE0
+#endif
+
+#if !defined(SRF08_RANGE_WAIT) 
+  #define SRF08_RANGE_WAIT     80000      // delay between Ping and Range Read commands
+#endif
+
+#if !defined(SRF08_RANGE_SLEEP) 
+  #define SRF08_RANGE_SLEEP    35000      // sleep this long before starting another Ping
+#endif
+
+#if !defined(SRF08_SENSOR_FIRST) 
+  #define SRF08_SENSOR_FIRST    0xF0    // the first sensor i2c address (after it has been moved)
+#endif
+
+#if !defined(SRF08_MAX_SENSORS) 
+  #define SRF08_MAX_SENSORS    4        // maximum number of sensors we'll allow (can go up to 8)
+#endif
+
+#define SONAR_MULTICAST_PING
+
+// registers of the device
+#define SRF08_REV_COMMAND    0
+#define SRF08_LIGHT_GAIN     1
+#define SRF08_ECHO_RANGE     2
+
+
+static struct {
+  // sensor registers from the MS561101BA datasheet
+  int32_t  range[SRF08_MAX_SENSORS];
+  int8_t   sensors;              // the number of sensors present
+  int8_t   current;              // the current sensor being read
+  uint8_t  state;
+  uint32_t deadline;
+} srf08_ctx;
+
+
+// read uncompensated temperature value: send command first
+void Sonar_init() {
+  memset(&srf08_ctx, 0, sizeof(srf08_ctx));
+  srf08_ctx.deadline = 4000000;
+}
+
+// this function works like readReg accept a failed read is a normal expectation
+// use for testing the existence of sensors on the i2c bus
+// a 0xffff code is returned if the read failed
+uint16_t i2c_try_readReg(uint8_t add, uint8_t reg) {
+  uint16_t count = 255;
+  i2c_rep_start(add+0);  // I2C write direction
+  i2c_write(reg);        // register selection
+  i2c_rep_start(add+1);  // I2C read direction
+  
+  TWCR = (1<<TWINT) | (1<<TWEN);
+  while (!(TWCR & (1<<TWINT))) {
+    count--;
+    if (count==0) {              //we are in a blocking state => we don't insist
+      TWCR = 0;                  //and we force a reset on TWINT register
+      return 0xffff;  // return failure to read
+    }
+  }
+  
+  uint8_t r = TWDR;
+  i2c_stop();
+  return r;  
+}
+
+// read a 16bit unsigned int from the i2c bus
+uint16_t i2c_readReg16(int8_t addr, int8_t reg) {
+  i2c_rep_start(addr);
+  i2c_write(reg);
+  i2c_rep_start(addr + 1);
+  return (i2c_readAck() <<8) | i2c_readNak();
+}
+
+void i2c_srf08_change_addr(int8_t current, int8_t moveto) {
+  // to change a srf08 address, we must write the following sequence to the command register
+  // this sequence must occur as 4 seperate i2c transactions!!
+  //   A0 AA A5 [addr]
+  i2c_writeReg(current, SRF08_REV_COMMAND, 0xA0);  delay(30);
+  i2c_writeReg(current, SRF08_REV_COMMAND, 0xAA);  delay(30);
+  i2c_writeReg(current, SRF08_REV_COMMAND, 0xA5);  delay(30);
+  i2c_writeReg(current, SRF08_REV_COMMAND, moveto);  delay(30); // now change i2c address
+  blinkLED(5,1,2);
+}
+
+// discover previously known sensors and any new sensor (move new sensors to assigned area)
+void i2c_srf08_discover() {
+  uint8_t addr;
+  uint16_t x;
+
+  // determine how many sensors are plugged in
+  srf08_ctx.sensors=0;
+  addr = SRF08_SENSOR_FIRST;
+  for(int i=0; i<SRF08_MAX_SENSORS && x!=0xff; i++) {
+    // read the revision as a way to check if sensor exists at this location
+    x = i2c_try_readReg(addr, SRF08_REV_COMMAND);
+    if(x!=0xffff) {
+      // detected a sensor at this address
+      srf08_ctx.sensors++;
+      addr += 2;
+    }
+  }
+  
+  // do not add sensors if we are already maxed
+  if(srf08_ctx.sensors < SRF08_MAX_SENSORS) {
+    // now determine if any sensor is on the 'new sensor' address (srf08 default address)
+    // we try to read the revision number
+    x = i2c_try_readReg(SRF08_DEFAULT_ADDRESS, SRF08_REV_COMMAND);
+    if(x!=0xffff) {
+      // new sensor detected at SRF08 default address
+      i2c_srf08_change_addr(SRF08_DEFAULT_ADDRESS, addr);  // move sensor to the next address
+      srf08_ctx.sensors++;
+    }
+  }
+}
+
+void Sonar_update() {
+  if (currentTime < srf08_ctx.deadline || (srf08_ctx.state==0 && armed)) return; 
+  srf08_ctx.deadline = currentTime;
+  TWBR = ((16000000L / 400000L) - 16) / 2; // change the I2C clock rate to 400kHz, SRF08 is ok with this speed
+  switch (srf08_ctx.state) {
+    case 0: 
+      i2c_srf08_discover();
+      if(srf08_ctx.sensors>0)
+        srf08_ctx.state++; 
+      else
+        srf08_ctx.deadline += 5000000; // wait 5 secs before trying search again
+      break;
+    case 1: 
+      srf08_ctx.current=0;
+      srf08_ctx.state++;
+      srf08_ctx.deadline += SRF08_RANGE_SLEEP;
+      break;
+#if defined(SONAR_MULTICAST_PING)
+    case 2:
+      // send a ping via the general broadcast address
+      i2c_writeReg(0, SRF08_REV_COMMAND, 0x51);  // start ranging, result in centimeters
+      srf08_ctx.state++;
+      srf08_ctx.deadline += SRF08_RANGE_WAIT;
+      break;
+    case 3: 
+      srf08_ctx.range[srf08_ctx.current] = i2c_readReg16( SRF08_SENSOR_FIRST+(srf08_ctx.current<<1), SRF08_ECHO_RANGE);
+      srf08_ctx.current++;
+      if(srf08_ctx.current >= srf08_ctx.sensors)
+        srf08_ctx.state=1;
+      break;
+#else
+    case 2:
+      // send a ping to the current sensor
+      i2c_writeReg(SRF08_SENSOR_FIRST+(srf08_ctx.current<<1), SRF08_REV_COMMAND, 0x51);  // start ranging, result in centimeters
+      srf08_ctx.state++;
+      srf08_ctx.deadline += SRF08_RANGE_WAIT;
+      break;
+    case 3: 
+      srf08_ctx.range[srf08_ctx.current] = i2c_readReg16(SRF08_SENSOR_FIRST+(srf08_ctx.current<<1), SRF08_ECHO_RANGE);
+      srf08_ctx.current++;
+      if(srf08_ctx.current >= srf08_ctx.sensors)
+        srf08_ctx.state=1;
+      else
+        srf08_ctx.state=2; 
+      break;
+#endif
+  } 
+sonarAlt = srf08_ctx.range[0]; //tmp
+}
+#else
+inline void Sonar_init() {}
+inline void Sonar_update() {}
+#endif
+
+
 void initSensors() {
   delay(200);
   POWERPIN_ON;
@@ -1238,4 +1411,5 @@ void initSensors() {
   if (BARO) Baro_init();
   if (MAG) Mag_init();
   if (ACC) {ACC_init();acc_25deg = acc_1G * 0.423;}
+  if (SONAR) Sonar_init();
 }

@@ -86,10 +86,6 @@ void computeIMU () {
 // Currently Magnetometer uses separate CF which is used only
 // for heading approximation.
 //
-// Modified: 19/04/2011  by ziss_dm
-// Version: V1.1
-//
-// code size reduction and tmp vector intermediate step for vector rotation computation: October 2011 by Alex
 // **************************************************
 
 //******  advanced users settings *******************
@@ -234,13 +230,6 @@ void getEstimatedAttitude(){
   if ( ( 36 < accMag && accMag < 196 ) || smallAngle25 )
     for (axis = 0; axis < 3; axis++) {
       int16_t acc = ACC_VALUE;
-      #if !defined(TRUSTED_ACCZ)
-        if (smallAngle25 && axis == YAW)
-          //We consider ACCZ = acc_1G when the acc on other axis is small.
-          //It's a tweak to deal with some configs where ACC_Z tends to a value < acc_1G when high throttle is applied.
-          //This tweak applies only when the multi is not in inverted position
-          acc = acc_1G;      
-      #endif
       EstG.A[axis] = (EstG.A[axis] * GYR_CMPF_FACTOR + acc) * INV_GYR_CMPF_FACTOR;
     }
   #if MAG
