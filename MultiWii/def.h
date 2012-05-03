@@ -298,7 +298,7 @@
   #define V_BATPIN                   A0    // Analog PIN 0
   #define PSENSORPIN                 A2    // Analog PIN 2
   #define PCINT_PIN_COUNT            8
-  #define PCINT_RX_BITS              (1<<0),(1<<1),(1<<2),(1<<3),(1<<4),(1<<5),(1<<6),(1<<7)
+  #define PCINT_RX_BITS              (1<<2),(1<<4),(1<<5),(1<<6),(1<<7),(1<<0),(1<<1),(1<<3)
   #define PCINT_RX_PORT              PORTK
   #define PCINT_RX_MASK              PCMSK2
   #define PCIR_PORT_BIT              (1<<2)
@@ -437,11 +437,11 @@
   #endif
 #endif
 
-#if defined(FREEIMUv043)
- #define FREEIMUv04
+#if defined(FREEIMUv04)
+ #define FREEIMUv043
 #endif
 
-#if defined(FREEIMUv04)
+#if defined(FREEIMUv043)
   #define MPU6050
   #define HMC5883
   #define MS561101BA
@@ -983,6 +983,21 @@
   #endif
 #endif
 
+#if (defined(LCD_VT100))
+  #if !(defined(MULTILINE_PRE))
+    #define MULTILINE_PRE 6
+  #endif
+  #if !(defined(MULTILINE_POST))
+    #define MULTILINE_POST 9
+  #endif
+#elif (defined(OLED_I2C_128x64))
+  #if !(defined(MULTILINE_PRE))
+    #define MULTILINE_PRE 3
+  #endif
+  #if !(defined(MULTILINE_POST))
+    #define MULTILINE_POST 5
+  #endif
+#endif
 
 /**************************************************************************************/
 /***************               Error Checking Section              ********************/
