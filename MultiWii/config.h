@@ -133,7 +133,7 @@
 
 /* I2C magnetometer */
 //#define HMC5843
-//#define HMC5883
+#define HMC5883
 //#define AK8975
 //#define MAG3110
 
@@ -393,7 +393,7 @@
 /* interleaving delay in micro seconds between 2 readings WMP/NK in a WMP+NK config
    if the ACC calibration time is very long (20 or 30s), try to increase this delay up to 4000
    it is relevent only for a conf with NK */
-#define INTERLEAVING_DELAY 3000
+#define INTERLEAVING_DELAY 2400
 
 /* when there is an error on I2C bus, we neutralize the values during a short time. expressed in microseconds
    it is relevent only for a conf with at least a WMP */
