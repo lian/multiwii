@@ -1,6 +1,5 @@
 PORT=/dev/ttyUSB0
-#BOARD = atmega328
-BOARD = atmega168
+BOARD = atmega328
 
 # GLFAG = 
 # OFLAG = -Os
