@@ -90,20 +90,20 @@ void serialCom() {
               GPS_speed = read16();
               GPS_update = 1; break;
             case MSP_SET_PID:
-              for(i=0;i<PIDITEMS;i++) {P8[i]=read8();I8[i]=read8();D8[i]=read8();} break;
+              for(i=0;i<PIDITEMS;i++) {conf.P8[i]=read8();conf.I8[i]=read8();conf.D8[i]=read8();} break;
             case MSP_SET_BOX:
-              for(i=0;i<CHECKBOXITEMS;i++) {activate[i]=read16();} break;
+              for(i=0;i<CHECKBOXITEMS;i++) {conf.activate[i]=read16();} break;
             case MSP_SET_RC_TUNING:
-              rcRate8 = read8();
-              rcExpo8 = read8();
-              rollPitchRate = read8();
-              yawRate = read8();
-              dynThrPID = read8();
-              thrMid8 = read8();
-              thrExpo8 = read8();break;
+              conf.rcRate8 = read8();
+              conf.rcExpo8 = read8();
+              conf.rollPitchRate = read8();
+              conf.yawRate = read8();
+              conf.dynThrPID = read8();
+              conf.thrMid8 = read8();
+              conf.thrExpo8 = read8();break;
             case MSP_SET_MISC:
               #if defined(POWERMETER)
-                powerTrigger1 = read16() / PLEVELSCALE; // we rely on writeParams() to compute corresponding pAlarm value
+                conf.powerTrigger1 = read16() / PLEVELSCALE; // we rely on writeParams() to compute corresponding pAlarm value
               #endif
               break;
           }
@@ -137,7 +137,7 @@ void serialCom() {
               headSerialReply(c,8);
               serialize16(cycleTime);
               serialize16(i2c_errors_count);
-              serialize16((ACC|nunchuk)|BARO<<1|MAG<<2|GPS<<3|SONAR<<4);
+              serialize16(ACC|BARO<<1|MAG<<2|GPS<<3|SONAR<<4);
               serialize16(accMode<<BOXACC|baroMode<<BOXBARO|magMode<<BOXMAG|armed<<BOXARM|
                           GPSModeHome<<BOXGPSHOME|GPSModeHold<<BOXGPSHOLD|headFreeMode<<BOXHEADFREE|
                           passThruMode<<BOXPASSTHRU|rcOptions[BOXBEEPERON]<<BOXBEEPERON);
@@ -172,7 +172,7 @@ void serialCom() {
             case MSP_COMP_GPS:
               headSerialReply(c,5);
               serialize16(GPS_distanceToHome);
-              serialize16(GPS_directionToHome+180);
+              serialize16(GPS_directionToHome);
               serialize8(GPS_update);
               tailSerialReply();break;
             case MSP_ATTITUDE:
@@ -191,21 +191,21 @@ void serialCom() {
               tailSerialReply();break;
             case MSP_RC_TUNING:
               headSerialReply(c,7);
-              serialize8(rcRate8);
-              serialize8(rcExpo8);
-              serialize8(rollPitchRate);
-              serialize8(yawRate);
-              serialize8(dynThrPID);
-              serialize8(thrMid8);
-              serialize8(thrExpo8);
+              serialize8(conf.rcRate8);
+              serialize8(conf.rcExpo8);
+              serialize8(conf.rollPitchRate);
+              serialize8(conf.yawRate);
+              serialize8(conf.dynThrPID);
+              serialize8(conf.thrMid8);
+              serialize8(conf.thrExpo8);
               tailSerialReply();break;
             case MSP_PID:
               headSerialReply(c,3*PIDITEMS);
-              for(i=0;i<PIDITEMS;i++)    {serialize8(P8[i]);serialize8(I8[i]);serialize8(D8[i]);}
+              for(i=0;i<PIDITEMS;i++)    {serialize8(conf.P8[i]);serialize8(conf.I8[i]);serialize8(conf.D8[i]);}
               tailSerialReply();break;
             case MSP_BOX:
               headSerialReply(c,2*CHECKBOXITEMS);
-              for(i=0;i<CHECKBOXITEMS;i++)    {serialize16(activate[i]);}
+              for(i=0;i<CHECKBOXITEMS;i++)    {serialize16(conf.activate[i]);}
               tailSerialReply();break;
             case MSP_MISC:
               headSerialReply(c,2);
@@ -216,7 +216,7 @@ void serialCom() {
               for(i=0;i<8;i++) {serialize8(PWM_PIN[i]);}
               tailSerialReply();break;
             case MSP_RESET_CONF:
-              checkNewConf++;checkFirstTime();break;
+              conf.checkNewConf++;checkFirstTime();break;
             case MSP_ACC_CALIBRATION:
               calibratingA=400;break;
             case MSP_MAG_CALIBRATION:
@@ -297,7 +297,7 @@ void oldSerialCom(uint8_t sr) {
 // it cant have the same name as in the arduino API because it wont compile for the promini (eaven if it will be not compiled)
 // *******************************************************
 #if defined(TEENSY20)
-  unsigned char T_USB_Available(unsigned char ignored){
+  unsigned char T_USB_Available(){
     int n = Serial.available();
     if (n > 255) n = 255;
     return n;
@@ -359,6 +359,10 @@ void SerialOpen(uint8_t port, uint32_t baud) {
   switch (port) {
     #if !defined(PROMICRO)
     case 0: UCSR0A  = (1<<U2X0); UBRR0H = h; UBRR0L = l; UCSR0B |= (1<<RXEN0)|(1<<TXEN0)|(1<<RXCIE0); break;
+    #else
+      #if (ARDUINO > 100) && !defined(TEENSY20)
+        case 0: UDIEN &= ~(1<<SOFE); // disable the USB frame interrupt of arduino (it causes strong jitter and we dont need it)
+      #endif
     #endif
     #if defined(MEGA) || defined(PROMICRO)
     case 1: UCSR1A  = (1<<U2X1); UBRR1H = h; UBRR1L = l; UCSR1B |= (1<<RXEN1)|(1<<TXEN1)|(1<<RXCIE1); break;
@@ -420,10 +424,13 @@ ISR(USART_RX_vect){
 
 uint8_t SerialRead(uint8_t port) {
   #if defined(PROMICRO)
-    #if !defined(TEENSY20)
-      if(port == 0) return USB_Recv(USB_CDC_RX);
-    #else
+     #if defined(TEENSY20)
       if(port == 0) return Serial.read();
+    #else
+      #if (ARDUINO > 100)
+        USB_Flush(USB_CDC_TX);
+      #endif
+      if(port == 0) return USB_Recv(USB_CDC_RX);      
     #endif
     port = 0;
   #endif

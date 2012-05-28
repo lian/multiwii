@@ -2,6 +2,10 @@
 #
 # - remove cygwin parts
 #
+# version 2012-04-08 - Stefan Tomanek <stefan@pico.ruhr.de>
+#
+# - try to use installed Arduino libraries (again)
+# - build in local ./build directory
 #
 # version 2012-03-04 - lian
 #
@@ -64,7 +68,7 @@ export LANG=C
 SRCROOT			:=	$(realpath $(dir $(firstword $(MAKEFILE_LIST))))
 
 # Work out the sketch name from the name of the source directory.
-SKETCH			:=	$(lastword $(subst /, ,$(SRCROOT)))
+SKETCH			?=	$(lastword $(subst /, ,$(SRCROOT)))
 
 # Work out where we are going to be building things
 TMPDIR			?=	/tmp
@@ -123,6 +127,8 @@ ifeq ($(ARDUINO),)
     $(warning WARNING: More than one copy of Arduino was found, using $(ARDUINO))
   endif
 endif
+
+HARDWARE_DIR ?= $(ARDUINO)/hardware/$(HARDWARE)
 
 ################################################################################
 # Tools
@@ -208,7 +214,7 @@ endif
 #
 
 # Sketch source files
-SKETCHPDESRCS		:=	$(wildcard $(SRCROOT)/*.pde)
+SKETCHPDESRCS		:=	$(wildcard $(SRCROOT)/*.pde) $(wildcard $(SRCROOT)/*.ino)
 SKETCHSRCS		:=	$(wildcard $(addprefix $(SRCROOT)/,$(SRCSUFFIXES)))
 SKETCHPDE		:=	$(wildcard $(SRCROOT)/$(SKETCH).ino)
 SKETCHCPP		:=	$(BUILDROOT)/$(SKETCH).cpp

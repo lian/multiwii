@@ -737,7 +737,7 @@ void mixTable() {
     motor[0] = PIDMIX( 0,+4/3, 0); //REAR
     motor[1] = PIDMIX(-1,-2/3, 0); //RIGHT
     motor[2] = PIDMIX(+1,-2/3, 0); //LEFT
-    servo[5] = constrain(tri_yaw_middle + YAW_DIRECTION * axisPID[YAW], TRI_YAW_CONSTRAINT_MIN, TRI_YAW_CONSTRAINT_MAX); //REAR
+    servo[5] = constrain(conf.tri_yaw_middle + YAW_DIRECTION * axisPID[YAW], TRI_YAW_CONSTRAINT_MIN, TRI_YAW_CONSTRAINT_MAX); //REAR
   #endif
   #ifdef QUADP
     motor[0] = PIDMIX( 0,+1,-1); //REAR
@@ -874,8 +874,8 @@ void mixTable() {
        servo[0]  = PITCH_DIRECTION_L * axisPID[PITCH]        + ROLL_DIRECTION_L * axisPID[ROLL];
        servo[1]  = PITCH_DIRECTION_R * axisPID[PITCH]        + ROLL_DIRECTION_R * axisPID[ROLL];
     }
-    servo[0]  = constrain(servo[0] + wing_left_mid , WING_LEFT_MIN,  WING_LEFT_MAX );
-    servo[1]  = constrain(servo[1] + wing_right_mid, WING_RIGHT_MIN, WING_RIGHT_MAX);
+    servo[0]  = constrain(servo[0] + conf.wing_left_mid , WING_LEFT_MIN,  WING_LEFT_MAX );
+    servo[1]  = constrain(servo[1] + conf.wing_right_mid, WING_RIGHT_MIN, WING_RIGHT_MAX);
   #endif
   
   /************************************************************************************************************/
@@ -883,7 +883,6 @@ void mixTable() {
     // Common parts for Plane and Heli
     static int16_t   servoMid[8];                        // Midpoint on servo
     static uint8_t   servoTravel[8] = SERVO_RATES;       // Rates in 0-100% 
-    static int8_t    Mid[8] = SERVO_OFFSET;
     static int8_t    servoReverse[8] = SERVO_DIRECTION ; // Inverted servos
     static int16_t   servoLimit[8][2]; // Holds servoLimit data
 
@@ -893,7 +892,7 @@ void mixTable() {
   #define SERVO_MIN 1020           // limit servo travel range must be inside [1020;2000]
   #define SERVO_MAX 2000           // limit servo travel range must be inside [1020;2000]
     for(i=0; i<8; i++){  //  Set rates with 0 - 100%. 
-      servoMid[i]     =MIDRC + Mid[i];
+      servoMid[i]     =MIDRC + conf.servoTrim[i];
       servoLimit[i][0]=servoMid[i]-((servoMid[i]-SERVO_MIN)   *(servoTravel[i]*0.01));
       servoLimit[i][1]=servoMid[i]+((SERVO_MAX - servoMid[i]) *(servoTravel[i]*0.01));  
     }
@@ -929,7 +928,7 @@ void mixTable() {
       servo[6]  =(servoMid[6] + (axisPID[PITCH]             *servoReverse[6]));   //   Elevator
     } 
     // ServoRates
-    for(uint8_t i=3;i<8;i++){ 
+    for(i=3;i<8;i++){
       servo[i]  = map(servo[i], SERVO_MIN, SERVO_MAX,servoLimit[i][0],servoLimit[i][1]);
       servo[i]  = constrain( servo[i], SERVO_MIN, SERVO_MAX);
     }
@@ -945,7 +944,6 @@ void mixTable() {
     static int16_t   servoEndpiont[8][2];
     static int16_t   servoHigh[8] = SERVO_ENDPOINT_HIGH; // HIGHpoint on servo
     static int16_t   servoLow[8]  = SERVO_ENDPOINT_LOW ; // LOWpoint on servo
-    static int8_t    Mid[8] = SERVO_OFFSET;
 
   /***************************
    * servo settings Heli. 
@@ -979,7 +977,7 @@ void mixTable() {
   #define HeliXPIDMIX(Z,Y,X) collRange[1]+collective*Z + heliNick*Y +  heliRoll*X
 
   // Yaw is common for Heli 90 & 120
-    uint16_t yawControll =  YAW_CENTER + (axisPID[YAW]*YAW_DIRECTION);
+    uint16_t yawControll =  YAW_CENTER + (axisPID[YAW]*YAW_DIRECTION) + conf.servoTrim[5];
 
   /* Throttle & YAW
   ********************
@@ -1001,21 +999,21 @@ void mixTable() {
     static int8_t leftMix[3] =SERVO_LEFT;
     static int8_t rightMix[3]=SERVO_RIGHT;
 
-    servo[3]  =  HeliXPIDMIX( (nickMix[0]*0.1) , nickMix[1]*0.1, nickMix[2]*0.1) +Mid[3] ;   //    NICK  servo
-    servo[4]  =  HeliXPIDMIX( (leftMix[0]*0.1) , leftMix[1]*0.1, leftMix[2]*0.1) +Mid[4] ;   //    LEFT servo
-    servo[6]  =  HeliXPIDMIX( (rightMix[0]*0.1),rightMix[1]*0.1,rightMix[2]*0.1) +Mid[6] ;   //    RIGHT  servo  
+    servo[3]  =  HeliXPIDMIX( (nickMix[0]*0.1) , nickMix[1]*0.1, nickMix[2]*0.1) +conf.servoTrim[3] ;   //    NICK  servo
+    servo[4]  =  HeliXPIDMIX( (leftMix[0]*0.1) , leftMix[1]*0.1, leftMix[2]*0.1) +conf.servoTrim[4] ;   //    LEFT servo
+    servo[6]  =  HeliXPIDMIX( (rightMix[0]*0.1),rightMix[1]*0.1,rightMix[2]*0.1) +conf.servoTrim[6] ;   //    RIGHT  servo
 
   #endif
 
   /************************************************************************************************************/
   #ifdef HELI_90_DEG   
     static int8_t servoDir[3]=SERVO_DIRECTIONS;   
-    servo[3]  = HeliXPIDMIX( +0, servoDir[1], -0)+Mid[3] ;      //     NICK  servo
-    servo[4]  = HeliXPIDMIX( +0, +0, servoDir[2])+Mid[4] ;      //     ROLL servo
-    servo[6]  = HeliXPIDMIX( servoDir[0], +0, +0)+Mid[6] ;      //     COLLECTIVE  servo  
+    servo[3]  = HeliXPIDMIX( +0, servoDir[1], -0)+conf.servoTrim[3] ;      //     NICK  servo
+    servo[4]  = HeliXPIDMIX( +0, +0, servoDir[2])+conf.servoTrim[4] ;      //     ROLL servo
+    servo[6]  = HeliXPIDMIX( servoDir[0], +0, +0)+conf.servoTrim[6] ;      //     COLLECTIVE  servo
   #endif    
 
-    for(uint8_t i=3;i<8;i++){
+    for(i=3;i<8;i++){
       servo[i]  = constrain( servo[i], servoEndpiont[i][0], servoEndpiont[i][1] ); 
     }
 

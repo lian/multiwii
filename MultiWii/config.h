@@ -94,6 +94,7 @@
       //#define DROTEK_10DOF_MS // Drotek 10DOF with ITG3200, BMA180, HMC5883, MS5611, LLC
       //#define DROTEK_6DOFv2   // Drotek 6DOF v2
       //#define DROTEK_6DOF_MPU // Drotek 6DOF with MPU6050
+      //#define DROTEK_10DOF_MPU//
       //#define MONGOOSE1_0     // mongoose 1.0    http://store.ckdevices.com/
       //#define CRIUS_LITE      // Crius MultiWii Lite
       //#define CRIUS_SE        // Crius MultiWii SE
@@ -105,15 +106,22 @@
       //#define GY_86           // Chinese 10 DOF with  MPU6050 HMC5883L MS5611, LLC
       //#define INNOVWORKS_10DOF // with ITG3200, BMA180, HMC5883, BMP085 available here http://www.diymulticopter.com
       //#define INNOVWORKS_6DOF // with ITG3200, BMA180 available here http://www.diymulticopter.com
-
+      //#define IOI_Mini_Multiwii// www.bambucopter.com
+      //#define Bobs_6DOF_V1    // BobsQuads 6DOF V1 with ITG3200 & BMA180
+      //#define Bobs_9DOF_V1	 // BobsQuads 9DOF V1 with ITG3200, BMA180 & HMC5883L
+      //#define Bobs_10DOF_BMP_V1 // BobsQuads 10DOF V1 with ITG3200, BMA180, HMC5883L & BMP180 - BMP180 is software compatible with BMP085
+      //#define FLYDUINO_MPU
+      
     /***************************    independent sensors    ********************************/
       //leave it commented if you already checked a specific board above
       /* I2C gyroscope */
+      //#define WMP
       //#define ITG3200
       //#define L3G4200D
       //#define MPU6050       //combo + ACC
 
       /* I2C accelerometer */
+      //#define NUNCHUCK  // if you want to use the nunckuk connected to a WMP
       //#define MMA745
       //#define ADXL345
       //#define BMA020
@@ -435,6 +443,11 @@
 /*****************                                                                 ***************/
 /*************************************************************************************************/
 
+  /* Pseudo-derivative conrtroller for level mode (experimental)
+     Additional information: http://www.multiwii.com/forum/viewtopic.php?f=8&t=503 */
+  //#define LEVEL_PDF
+
+
   /********                          Failsave settings                 ********************/
     /* Failsafe check pulse on THROTTLE channel. If the pulse is OFF (on only THROTTLE or on all channels) the failsafe procedure is initiated.
        After FAILSAVE_DELAY time of pulse absence, the level mode is on (if ACC or nunchuk is avaliable), PITCH, ROLL and YAW is centered
@@ -446,7 +459,7 @@
     //#define FAILSAFE                                  // uncomment  to activate the failsafe function
     #define FAILSAVE_DELAY     10                     // Guard time for failsafe activation after signal lost. 1 step = 0.1sec - 1sec in example
     #define FAILSAVE_OFF_DELAY 200                    // Time for Landing before motors stop in 0.1sec. 1 step = 0.1sec - 20sec in example
-    #define FAILSAVE_THR0TTLE  (MINTHROTTLE + 200)    // Throttle level used for landing - may be relative to MINTHROTTLE - as in this case
+    #define FAILSAVE_THROTTLE  (MINTHROTTLE + 200)    // Throttle level used for landing - may be relative to MINTHROTTLE - as in this case
 
   /*****************                DFRobot LED RING    *********************************/
     /* I2C DFRobot LED RING communication */
@@ -497,6 +510,9 @@
        uncomment the first line to select the GPS serial port of the arduino */
     //#define GPS_SERIAL 2 // should be 2 for flyduino v2. It's the serial port number on arduino MEGA
     #define GPS_BAUD   115200
+    
+    //#define GPS_PROMINI_SERIAL    57600 // Will Autosense if GPS is connected when ardu boots!.....
+   
 
     /* I2C GPS device made with an independant arduino + GPS device
        including some navigation functions
@@ -504,15 +520,23 @@
        http://code.google.com/p/i2c-gps-nav/ */
     //#define I2C_GPS
 
-    /* GPS data readed from Misio-OSD  ( EXPERIMENTAL )
-       If we have Misio-OSD with GPS module connected to OSD we can use this GPS for navigation purpose.
-       Working with OSD firmware v0.66 or newer.
-       contribution from Mis */
+    /* GPS data readed from OSD -- still need some more code to work */
     //#define GPS_FROM_OSD
 
-    /* Pseudo-derivative conrtroller for level mode (experimental)
-       Additional information: http://www.multiwii.com/forum/viewtopic.php?f=8&t=503 */
-    //#define LEVEL_PDF
+    /* GPS navigation can control the heading */
+    
+    #define NAV_CONTROLS_HEADING       true      // copter faces toward the navigation point, maghold must be enabled for it
+    #define NAV_TAIL_FIRST             false     // true - copter comes in with tail first 
+    #define NAV_SET_TAKEOFF_HEADING    true      // true - when copter arrives to home position it rotates it's head to takeoff direction
+    
+    #define MAG_DECLINIATION  3.96f              //For Budapest Hungary.
+    //Get your magnetic decliniation from here : http://magnetic-declination.com/
+    //Convert the degree+minutes into decimal degree by ==> degree+minutes*(1/60)
+    //Note the sign on declination it could be negative or positive (WEST or EAST)
+    
+    #define GPS_FILTERING              true      // add a 5 element moving average filter to GPS coordinates, helps eliminate gps noise but adds latency
+    #define GPS_LOW_SPEED_D_FILTER     true      // below .5m/s speed ignore D term for POSHOLD_RATE, theoretically this also removed D term induced noise
+    #define GPS_WP_RADIUS              200       // if we are within this distance to a waypoint then we consider it reached (distance is in cm)
 
 
   /**************************************************************************************/
@@ -721,6 +745,32 @@
        for use with digital servos
        dont use it with analog servos! thay may get damage. (some will work but be careful)*/
     //#define SERVO_RFR_300HZ
+
+  /********************************************************************/
+  /****           IMU complimentary filter tuning                  ****/
+  /********************************************************************/
+
+    /* Set the Low Pass Filter factor for ACC */
+    /* Increasing this value would reduce ACC noise (visible in GUI), but would increase ACC lag time*/
+    /* Comment this if  you do not want filter at all.*/
+    //#define ACC_LPF_FACTOR 100
+
+    /* Set the Low Pass Filter factor for Magnetometer */
+    /* Increasing this value would reduce Magnetometer noise (not visible in GUI), but would increase Magnetometer lag time*/
+    /* Comment this if  you do not want filter at all.*/
+    /* Default WMC value: n/a*/
+    //#define MG_LPF_FACTOR 4
+
+    /* Set the Gyro Weight for Gyro/Acc complementary filter */
+    /* Increasing this value would reduce and delay Acc influence on the output of the filter*/
+    /* Default WMC value: 300*/
+    //#define GYR_CMPF_FACTOR 400.0f
+
+    /* Set the Gyro Weight for Gyro/Magnetometer complementary filter */
+    /* Increasing this value would reduce and delay Magnetometer influence on the output of the filter*/
+    /* Default WMC value: n/a*/
+    //#define GYR_CMPFM_FACTOR 200.0f
+
 
 
   /********************************************************************/
