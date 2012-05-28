@@ -11,7 +11,7 @@ March  2012     V2.0
 #include "config.h"
 #include "def.h"
 #include <avr/pgmspace.h>
-#define  VERSION  200
+#define  VERSION  201
 
 /*********** RC alias *****************/
 #define ROLL       0
@@ -74,7 +74,6 @@ static int32_t  EstAlt;             // in cm
 static int16_t  BaroPID = 0;
 static int32_t  AltHold;
 static int16_t  errorAltitudeI = 0;
-static uint8_t  buzzerState = 0;
 static uint8_t  toggleBeep = 0;
 static int16_t  debug1,debug2,debug3,debug4;
 static int16_t  sonarAlt; //to think about the unit
@@ -169,13 +168,13 @@ static uint16_t activate[CHECKBOXITEMS];
 // GPS
 // **********************
 static int32_t  GPS_latitude,GPS_longitude;
-static int32_t  GPS_latitude_home,GPS_longitude_home;
-static int32_t  GPS_latitude_hold,GPS_longitude_hold;
+static int32_t  GPS_latitude_home,GPS_longitude_home,GPS_altitude_home;
+static int32_t  GPS_latitude_hold,GPS_longitude_hold,GPS_altitude_hold;
 static uint8_t  GPS_fix , GPS_fix_home = 0;
 static uint8_t  GPS_numSat;
 static uint16_t GPS_distanceToHome,GPS_distanceToHold;       // distance to home or hold point in meters
 static int16_t  GPS_directionToHome,GPS_directionToHold;     // direction to home or hol point in degrees
-static uint16_t GPS_altitude,GPS_speed;                      // altitude in 0.1m and speed in 0.1m/s
+static int16_t  GPS_altitude,GPS_speed;                      // altitude in 0.1m and speed in 0.1m/s
 static uint8_t  GPS_update = 0;                              // it's a binary toogle to distinct a GPS position update
 static int16_t  GPS_angle[2] = { 0, 0};                      // it's the angles that must be applied for GPS correction
 
@@ -279,7 +278,7 @@ void annexCode() { // this code is excetuted at each loop and won't interfere wi
     #endif
                        )  || (NO_VBAT>vbat)                              ) // ToLuSe
     {                                          // VBAT ok AND powermeter ok, buzzer off
-      buzzerFreq = 0; buzzerState = 0;
+      buzzerFreq = 0;
     #if defined(POWERMETER)
     } else if (pMeter[PMOTOR_SUM] > pAlarm) {                             // sound alarm for powermeter
       buzzerFreq = 4;
@@ -517,14 +516,25 @@ void loop () {
 	  headFreeModeHold = heading;
         } else if (armed) armed = 0;
         rcDelayCommand = 0;
-      } else if ( (rcData[YAW] < MINCHECK || rcData[ROLL] < MINCHECK)  && armed == 1) {
+      #ifdef ALLOW_ARM_DISARM_VIA_TX_YAW
+      } else if ( (rcData[YAW] < MINCHECK )  && armed == 1) {
         if (rcDelayCommand == 20) armed = 0; // rcDelayCommand = 20 => 20x20ms = 0.4s = time to wait for a specific RC command to be acknowledged
-      } else if ( (rcData[YAW] > MAXCHECK || rcData[ROLL] > MAXCHECK) && rcData[PITCH] < MAXCHECK && armed == 0 && calibratingG == 0 && calibratedACC == 1) {
+      } else if ( (rcData[YAW] > MAXCHECK ) && rcData[PITCH] < MAXCHECK && armed == 0 && calibratingG == 0 && calibratedACC == 1) {
         if (rcDelayCommand == 20) {
-	  armed = 1;
-	  headFreeModeHold = heading;
+          armed = 1;
+          headFreeModeHold = heading;
         }
-     #ifdef LCD_TELEMETRY_AUTO
+      #endif
+      #ifdef ALLOW_ARM_DISARM_VIA_TX_ROLL
+      } else if ( (rcData[ROLL] < MINCHECK)  && armed == 1) {
+        if (rcDelayCommand == 20) armed = 0; // rcDelayCommand = 20 => 20x20ms = 0.4s = time to wait for a specific RC command to be acknowledged
+      } else if ( (rcData[ROLL] > MAXCHECK) && rcData[PITCH] < MAXCHECK && armed == 0 && calibratingG == 0 && calibratedACC == 1) {
+        if (rcDelayCommand == 20) {
+          armed = 1;
+          headFreeModeHold = heading;
+        }
+#endif
+      #ifdef LCD_TELEMETRY_AUTO
       } else if (rcData[ROLL] < MINCHECK && rcData[PITCH] > MAXCHECK && armed == 0) {
         if (rcDelayCommand == 20) {
            if (telemetry_auto) {
@@ -641,7 +651,11 @@ void loop () {
       }
     #endif
     if (rcOptions[BOXPASSTHRU]) {passThruMode = 1;}
-    else passThruMode = 0;
+    else {passThruMode = 0;}
+    
+    #ifdef FIXEDWING 
+      headFreeMode = 0;
+    #endif
   } else { // not in rc loop
     static uint8_t taskOrder=0; // never call all functions in the same loop, to avoid high delay spikes
     switch (taskOrder++ % 5) {
