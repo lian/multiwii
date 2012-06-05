@@ -106,7 +106,7 @@
       //#define GY_86           // Chinese 10 DOF with  MPU6050 HMC5883L MS5611, LLC
       //#define INNOVWORKS_10DOF // with ITG3200, BMA180, HMC5883, BMP085 available here http://www.diymulticopter.com
       //#define INNOVWORKS_6DOF // with ITG3200, BMA180 available here http://www.diymulticopter.com
-      //#define IOI_Mini_Multiwii// www.bambucopter.com
+      //#define IOI_MINI_MULTIWII// www.bambucopter.com
       //#define Bobs_6DOF_V1    // BobsQuads 6DOF V1 with ITG3200 & BMA180
       //#define Bobs_9DOF_V1	 // BobsQuads 9DOF V1 with ITG3200, BMA180 & HMC5883L
       //#define Bobs_10DOF_BMP_V1 // BobsQuads 10DOF V1 with ITG3200, BMA180, HMC5883L & BMP180 - BMP180 is software compatible with BMP085
@@ -299,7 +299,8 @@
       //#define A32U4ALLPINS
 
     /**********************************    PWM Setup     **********************************/
-      // activate all 6 hardware PWM outputs Motor 5 = D11 and 6 = D13. => not possible on ProMicro! (untested!)
+      // activate all 6 hardware PWM outputs Motor 5 = D11 and 6 = D13. 
+      // note: not possible on the sparkfun promicro (pin 11 & 13 are not broken out there)
       // if activated:
       // Motor 1-6 = 10-bit hardware PWM
       // Motor 7-8 = 8-bit Software PWM
@@ -470,8 +471,24 @@
     //#define LED_FLASHER_DDR DDRB
     //#define LED_FLASHER_PORT PORTB
     //#define LED_FLASHER_BIT PB4
+    //#define LED_FLASHER_SEQUENCE ( (uint8_t) 0 )
     // create double flashes
-    //#define LED_FLASHER_SEQUENCE ( (uint8_t) (1<<0 | 1<<2) )
+    //#define LED_FLASHER_SEQUENCE_ARMED ( (uint8_t) (1<<0 | 1<<2) )
+
+
+  /*******************************    Landing lights    *********************************/
+  /* Landing lights
+   *
+   * Use an output pin to control landing lights.
+   * They can be switched automatically when used in conjunction
+   * with altitude data from a sonar unit.
+   */
+    //#define LANDING_LIGHTS_DDR DDRC
+    //#define LANDING_LIGHTS_PORT PORTC
+    //#define LANDING_LIGHTS_BIT PC0
+
+    /* altitude above ground (in cm) as reported by sonar */
+    //#define LANDING_LIGHTS_AUTO_ALTITUDE 50
 
 
   /*************************    INFLIGHT ACC Calibration    *****************************/
@@ -519,6 +536,14 @@
        contribution from EOSBandi
        http://code.google.com/p/i2c-gps-nav/ */
     //#define I2C_GPS
+
+    /* I2C GPS device made with an indeedent ATTiny[24]313 + GPS device and
+       optional sonar device.
+       https://github.com/wertarbyte/tiny-gps/ */
+    /* get GPS data from Tiny-GPS */
+    //#define TINY_GPS
+    /* get sonar data from Tiny-GPS */
+    //#define TINY_GPS_SONAR
 
     /* GPS data readed from OSD -- still need some more code to work */
     //#define GPS_FROM_OSD
