@@ -54,6 +54,7 @@ static uint16_t calibratingG;
 static uint8_t  armed = 0;
 static uint16_t acc_1G;             // this is the 1G measured acceleration
 static int16_t  acc_25deg;
+static uint8_t  nunchuk = 0;
 static uint8_t  nunchukData = 0;    // if a nunchuck data is read
 static uint8_t  accMode = 0;        // if level mode is a activated
 static uint8_t  magMode = 0;        // if compass heading hold is a activated
@@ -347,7 +348,7 @@ void annexCode() { // this code is excetuted at each loop and won't interfere wi
   #endif
   buzzer(buzzerFreq); // external buzzer routine that handles buzzer events globally now
   
-  if ( (calibratingA>0 && ACC ) || (calibratingG>0) ) { // Calibration phasis
+  if ( (calibratingA>0 && (ACC || nunchuk) ) || (calibratingG>0) ) { // Calibration phasis
     LEDPIN_TOGGLE;
   } else {
     if (calibratedACC == 1) {LEDPIN_OFF;}
@@ -688,7 +689,7 @@ void loop () {
     }
 
     // note: if FAILSAFE is disable, failsafeCnt > 5*FAILSAVE_DELAY is always false
-    if (( rcOptions[BOXACC] || (failsafeCnt > 5*FAILSAVE_DELAY) ) && ACC ) { 
+    if (( rcOptions[BOXACC] || (failsafeCnt > 5*FAILSAVE_DELAY) ) && (ACC || nunchuk)) {
       // bumpless transfer to Level mode
       if (!accMode) {
         errorAngleI[ROLL] = 0; errorAngleI[PITCH] = 0;

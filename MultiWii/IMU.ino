@@ -9,16 +9,15 @@ void computeIMU () {
   //we separate the 2 situations because reading gyro values with a gyro only setup can be acchieved at a higher rate
   //gyro+nunchuk: we must wait for a quite high delay betwwen 2 reads to get both WM+ and Nunchuk data. It works with 3ms
   //gyro only: the delay to read 2 consecutive values can be reduced to only 0.65ms
-  #if defined(NUNCHUCK)
+  if (!ACC && nunchuk) {
     annexCode();
     while((micros()-timeInterleave)<INTERLEAVING_DELAY) ; //interleaving delay between 2 consecutive reads
     timeInterleave=micros();
-    ACC_getADC();
+    WMP_getRawADC();
     getEstimatedAttitude(); // computation time must last less than one interleaving delay
     while((micros()-timeInterleave)<INTERLEAVING_DELAY) ; //interleaving delay between 2 consecutive reads
     timeInterleave=micros();
-    nunchukData = 1;
-    while(nunchukData == 1) ACC_getADC(); // For this interleaving reading, we must have a gyro update at this point (less delay)
+    while(WMP_getRawADC() != 1) ; // For this interleaving reading, we must have a gyro update at this point (less delay)
 
     for (axis = 0; axis < 3; axis++) {
       // empirical, we take a weighted value of the current and the previous values
@@ -26,13 +25,15 @@ void computeIMU () {
       gyroData[axis] = (gyroADC[axis]*3+gyroADCprevious[axis])/4;
       gyroADCprevious[axis] = gyroADC[axis];
     }
-  #else
+  } else {
     #if ACC
       ACC_getADC();
       getEstimatedAttitude();
     #endif
     #if GYRO
       Gyro_getADC();
+    #else
+      WMP_getRawADC();
     #endif
     for (axis = 0; axis < 3; axis++)
       gyroADCp[axis] =  gyroADC[axis];
@@ -45,6 +46,8 @@ void computeIMU () {
     }
     #if GYRO
       Gyro_getADC();
+    #else
+      WMP_getRawADC();
     #endif
     for (axis = 0; axis < 3; axis++) {
       gyroADCinter[axis] =  gyroADC[axis]+gyroADCp[axis];
@@ -53,7 +56,7 @@ void computeIMU () {
       gyroADCprevious[axis] = gyroADCinter[axis]/2;
       if (!ACC) accADC[axis]=0;
     }
-  #endif
+  }
   #if defined(GYRO_SMOOTHING)
     static int16_t gyroSmooth[3] = {0,0,0};
     for (axis = 0; axis < 3; axis++) {
