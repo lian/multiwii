@@ -222,10 +222,16 @@
     #define SERVO_RATES      {100, 100, 100, 100, 100, 100, 100, 100} // Rates in 0-100%
     #define SERVO_DIRECTION  { -1,   1,   1,   -1,  1,   1,   1,   1 } // Invert servos by setting -1
 
-    //#define FLAP_CHANNEL     AUX4       // Define the Channel to controll Flaps with.If used.
-    #define FLAP_EP      { 1500, 1650 } // Endpooints for flaps on a 2 way switch else set {1020,2000} and program in radio.
-    #define FLAP_INVERT    { 1, -1 }    // Change direction om flaps { Wing1, Wing2 }
+    //#define FLAPPERONS    AUX4          // Mix Flaps with Aileroins.
+    #define FLAPPERON_EP   { 1500, 1700 } // Endpooints for flaps on a 2 way switch else set {1020,2000} and program in radio.
+    //#define FLAPPERON_EP   { 1200, 1500 } // Or Flapperons up for CrowMix 
+    #define FLAPPERON_INVERT { 1, -1 }    // Change direction om flapperons { Wing1, Wing2 }
+    
+    //#define FLAPS         AUX4          // Traditional Flaps on A2 invert with SERVO_DIRECTION servo[2).
+    #define FLAP_EP      { 1500, 1900 }   // Endpooints for flaps on a 2 way switch else set {1020,2000} and program in radio.
 
+    //#define FLAPSPEED     3             // Make flaps move slowm Higher value is Higher Speed.
+    // FlapSpeed is depending on Cykletime. High cykeltime needs higher flapspeed...
   //*************************** !!!!  Common for Heli & Airplane  !!!! ****************************//
 
     //#define D12_POWER      // Use D12 on PROMINI to power sensors. Will disable servo[4] on D12
@@ -446,7 +452,12 @@
 
   /* Pseudo-derivative conrtroller for level mode (experimental)
      Additional information: http://www.multiwii.com/forum/viewtopic.php?f=8&t=503 */
-  //#define LEVEL_PDF
+    //#define LEVEL_PDF
+
+  /*****************                Buzzer                 *********************************/
+    //#define BUZZER
+
+    //#define RCOPTIONSBEEP        //uncomment this if you want the buzzer to beep at any rcOptions change on channel Aux1 to Aux4
 
 
   /********                          Failsave settings                 ********************/
@@ -462,6 +473,7 @@
     #define FAILSAVE_OFF_DELAY 200                    // Time for Landing before motors stop in 0.1sec. 1 step = 0.1sec - 20sec in example
     #define FAILSAVE_THROTTLE  (MINTHROTTLE + 200)    // Throttle level used for landing - may be relative to MINTHROTTLE - as in this case
 
+
   /*****************                DFRobot LED RING    *********************************/
     /* I2C DFRobot LED RING communication */
     //#define LED_RING
@@ -474,6 +486,8 @@
     //#define LED_FLASHER_SEQUENCE ( (uint8_t) 0 )
     // create double flashes
     //#define LED_FLASHER_SEQUENCE_ARMED ( (uint8_t) (1<<0 | 1<<2) )
+    // full illumination
+    //#define LED_FLASHER_SEQUENCE_MAX 0xFF
 
 
   /*******************************    Landing lights    *********************************/
@@ -494,10 +508,6 @@
   /*************************    INFLIGHT ACC Calibration    *****************************/
     /* This will activate the ACC-Inflight calibration if unchecked */
     //#define INFLIGHT_ACC_CALIBRATION
-
-
-  /**************************    rc option-change beep    *******************************/
-    //#define RCOPTIONSBEEP        //uncomment this if you want the buzzer to beep at any rcOptions change on channel Aux1 to Aux4
 
   /**************************    Disable WMP power pin     *******************************/
     /* disable use of the POWER PIN */
@@ -545,6 +555,9 @@
     /* get sonar data from Tiny-GPS */
     //#define TINY_GPS_SONAR
 
+    /* indicate a valid GPS fix with at least 5 satellites by flashing the LED? */
+    #define GPS_LED_INDICATOR
+
     /* GPS data readed from OSD -- still need some more code to work */
     //#define GPS_FROM_OSD
 
@@ -562,6 +575,7 @@
     #define GPS_FILTERING              true      // add a 5 element moving average filter to GPS coordinates, helps eliminate gps noise but adds latency
     #define GPS_LOW_SPEED_D_FILTER     true      // below .5m/s speed ignore D term for POSHOLD_RATE, theoretically this also removed D term induced noise
     #define GPS_WP_RADIUS              200       // if we are within this distance to a waypoint then we consider it reached (distance is in cm)
+	#define NAV_SLEW_RATE              30		 // Adds a rate control to nav output, will smoothen out nav angle spikes
 
 
   /**************************************************************************************/
@@ -671,6 +685,7 @@
        after the resistor divisor we should get [0V;5V]->[0;1023] on analog V_BATPIN
        with R1=33k and R2=51k
        vbat = [0;1023]*16/VBATSCALE */
+    // must be associated with #define BUZZER !
     //#define VBAT              // uncomment this line to activate the vbat code
     #define VBATSCALE     131 // change this value if readed Battery voltage is different than real voltage
     #define VBATLEVEL1_3S 107 // 10,7V

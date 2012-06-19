@@ -1,14 +1,23 @@
-// 256 RX buffer is needed for GPS communication (64 or 128 was too short)
-// it avoids also modulo operations
 #if defined(MEGA)
-  uint8_t serialBufferRX[256][4];
-  volatile uint8_t serialHeadRX[4],serialTailRX[4];
+  #define UART_NUMBER 4
 #else
-  uint8_t serialBufferRX[256][1];
-  volatile uint8_t serialHeadRX[1],serialTailRX[1];
+  #define UART_NUMBER 1
 #endif
+#if defined(GPS_SERIAL)
+  #define RX_BUFFER_SIZE 256 // 256 RX buffer is needed for GPS communication (64 or 128 was too short)
+#else
+  #define RX_BUFFER_SIZE 64
+#endif
+#define TX_BUFFER_SIZE 128
+#define INBUF_SIZE 64
 
-#define MSP_IDENT                100   //out message         multitype + version
+static volatile uint8_t serialHeadRX[UART_NUMBER],serialTailRX[UART_NUMBER];
+static uint8_t serialBufferRX[RX_BUFFER_SIZE][UART_NUMBER];
+static volatile uint8_t headTX,tailTX;
+static uint8_t bufTX[TX_BUFFER_SIZE];
+static uint8_t inBuf[INBUF_SIZE];
+
+#define MSP_IDENT                100   //out message         multitype + multiwii version + protocol version + capability variable
 #define MSP_STATUS               101   //out message         cycletime & errors_count & sensor present & box activation
 #define MSP_RAW_IMU              102   //out message         9 DOF
 #define MSP_SERVO                103   //out message         8 servos
@@ -24,6 +33,8 @@
 #define MSP_BOX                  113   //out message         up to 16 checkbox (11 are used)
 #define MSP_MISC                 114   //out message         powermeter trig + 8 free for future use
 #define MSP_MOTOR_PINS           115   //out message         which pins are in use for motors & servos, for GUI 
+#define MSP_BOXNAMES             116   //out message         the aux switch names
+#define MSP_PIDNAMES             117   //out message         the PID names
 
 #define MSP_SET_RAW_RC           200   //in message          8 rc chan
 #define MSP_SET_RAW_GPS          201   //in message          fix, numsat, lat, lon, alt, speed
@@ -39,257 +50,294 @@
 
 #define MSP_DEBUG                254   //out message         debug1,debug2,debug3,debug4
 
-
-static uint8_t checksum,stateMSP,indRX,inBuf[64];
+static uint8_t checksum;
+static uint8_t indRX;
+static uint8_t cmdMSP;
 
 uint32_t read32() {
-  uint32_t t = inBuf[indRX++];
-  t+= inBuf[indRX++]<<8;
-  t+= (uint32_t)inBuf[indRX++]<<16;
-  t+= (uint32_t)inBuf[indRX++]<<24;
+  uint32_t t = read16();
+  t+= (uint32_t)read16()<<16;
   return t;
 }
-
 uint16_t read16() {
-  uint16_t t = inBuf[indRX++];
-  t+= inBuf[indRX++]<<8;
+  uint16_t t = read8();
+  t+= (uint16_t)read8()<<8;
   return t;
 }
-uint8_t read8()  {return inBuf[indRX++]&0xff;}
+uint8_t read8()  {
+  return inBuf[indRX++]&0xff;
+}
 
-void headSerialReply(uint8_t c,uint8_t s) {
-  serialize8('$');serialize8('M');serialize8('>');serialize8(s);serialize8(c);checksum = 0;
+void headSerialResponse(uint8_t err, uint8_t s) {
+  serialize8('$');
+  serialize8('M');
+  serialize8(err ? '!' : '>');
+  checksum = 0; // start calculating a new checksum
+  serialize8(s);
+  serialize8(cmdMSP);
+}
+
+void headSerialReply(uint8_t s) {
+  headSerialResponse(0, s);
+}
+
+void inline headSerialError(uint8_t s) {
+  headSerialResponse(1, s);
 }
 
 void tailSerialReply() {
   serialize8(checksum);UartSendData();
 }
 
+void serializeNames(PGM_P s) {
+  for (PGM_P c = s; pgm_read_byte(c); c++) {
+    serialize8(pgm_read_byte(c));
+  }
+}
+
 void serialCom() {
-  uint8_t i, c;
-  static uint8_t offset,dataSize;
+  uint8_t c;  
+  static uint8_t offset;
+  static uint8_t dataSize;
+  static enum _serial_state {
+    IDLE,
+    HEADER_START,
+    HEADER_M,
+    HEADER_ARROW,
+    HEADER_SIZE,
+    HEADER_CMD,
+  } c_state = IDLE;
   
   while (SerialAvailable(0)) {
+    uint8_t bytesTXBuff = ((uint8_t)(headTX-tailTX))%TX_BUFFER_SIZE; // indicates the number of occupied bytes in TX buffer
+    if (bytesTXBuff > TX_BUFFER_SIZE - 40 ) return; // ensure there is enough free TX buffer to go further (40 bytes margin)
     c = SerialRead(0);
 
-    if (stateMSP > 99) {                           // a message with a length indication, indicating a non null payload
-      if (offset <= dataSize) {                    // there are still some octets to read (including checksum) to complete a full message
-        if (offset < dataSize) checksum ^= c;      // the checksum is computed, except for the last octet
-        inBuf[offset++] = c;
-      } else {                                     // we have read all the payload
-        if ( checksum == inBuf[dataSize] ) {       // we check is the computed checksum is ok
-          switch(stateMSP) {                       // if yes, then we execute different code depending on the message code. read8/16/32 will look into the inBuf buffer
-            case MSP_SET_RAW_RC:
-              for(i=0;i<8;i++) {rcData[i] = read16();} break;
-            case MSP_SET_RAW_GPS:
-              GPS_fix = read8();
-              GPS_numSat = read8();
-              GPS_coord[LAT] = read32();
-              GPS_coord[LON] = read32();
-              GPS_altitude = read16();
-              GPS_speed = read16();
-              GPS_update = 1; break;
-            case MSP_SET_PID:
-              for(i=0;i<PIDITEMS;i++) {conf.P8[i]=read8();conf.I8[i]=read8();conf.D8[i]=read8();} break;
-            case MSP_SET_BOX:
-              for(i=0;i<CHECKBOXITEMS;i++) {conf.activate[i]=read16();} break;
-            case MSP_SET_RC_TUNING:
-              conf.rcRate8 = read8();
-              conf.rcExpo8 = read8();
-              conf.rollPitchRate = read8();
-              conf.yawRate = read8();
-              conf.dynThrPID = read8();
-              conf.thrMid8 = read8();
-              conf.thrExpo8 = read8();break;
-            case MSP_SET_MISC:
-              #if defined(POWERMETER)
-                conf.powerTrigger1 = read16() / PLEVELSCALE; // we rely on writeParams() to compute corresponding pAlarm value
-              #endif
-              break;
-          }
-        }
-        stateMSP = 0;                              // in any case we reset the MSP state
+    if (c_state == IDLE) {
+      c_state = (c=='$') ? HEADER_START : IDLE;
+    } else if (c_state == HEADER_START) {
+      c_state = (c=='M') ? HEADER_M : IDLE;
+    } else if (c_state == HEADER_M) {
+      c_state = (c=='<') ? HEADER_ARROW : IDLE;
+    } else if (c_state == HEADER_ARROW) {
+      if (c > INBUF_SIZE) {  // now we are expecting the payload size
+        c_state = IDLE;
+        continue;
       }
-    }
-
-    if (stateMSP < 5) {
-      if (stateMSP == 4) {                           // this protocol state indicates we have a message with a lenght indication, and we read here the message code (fifth octet) 
-        if (c > 99) {                                // we check if it's a valid code (should be >99)
-          stateMSP = c;                              // the message code is then reuse to feed the protocol state
-          offset = 0;checksum = 0;indRX=0;           // and we init some values which will be used in the next loops to grasp the payload
-        } else {
-          stateMSP = 0;                              // the message code seems to be invalid. this should not happen => we reset the protocol state
-        }
+      dataSize = c;
+      offset = 0;
+      checksum = 0;
+      indRX = 0;
+      checksum ^= c;
+      c_state = HEADER_SIZE;  // the command is to follow
+    } else if (c_state == HEADER_SIZE) {
+      cmdMSP = c;
+      checksum ^= c;
+      c_state = HEADER_CMD;
+    } else if (c_state == HEADER_CMD && offset < dataSize) {
+      checksum ^= c;
+      inBuf[offset++] = c;
+    } else if (c_state == HEADER_CMD && offset >= dataSize) {
+      if (checksum == c) {  // compare calculated and transferred checksum
+        evaluateCommand();  // we got a valid packet, evaluate it
       }
-      if (stateMSP == 3) {                           // here, we need to check if the fourth octet indicates a code indication (>99) or a payload lenght indication (<100)
-        if (c<100) {                                 // a message with a length indication, indicating a non null payload
-          stateMSP++;                                // we update the protocol state to read the next octet
-          dataSize = c;                              // we store the payload lenght
-          if (dataSize>63) dataSize=63;              // in order to avoid overflow, we limit the size. this should not happen
-        } else {
-          switch(c) {                                // if we are here, the fourth octet indicates a code message
-            case MSP_IDENT:                          // and we check message code to execute the relative code
-              headSerialReply(c,2);                  // we reply with an header indicating a payload lenght of 2 octets
-              serialize8(VERSION);                   // the first octet. serialize8/16/32 is used also to compute a checksum
-              serialize8(MULTITYPE);                 // the second one
-              tailSerialReply();break;               // mainly to send the last octet which is the checksum
-            case MSP_STATUS:
-              headSerialReply(c,8);
-              serialize16(cycleTime);
-              serialize16(i2c_errors_count);
-              serialize16(ACC|BARO<<1|MAG<<2|GPS<<3|SONAR<<4);
-              serialize16(accMode<<BOXACC|baroMode<<BOXBARO|magMode<<BOXMAG|armed<<BOXARM|
-                          GPSModeHome<<BOXGPSHOME|GPSModeHold<<BOXGPSHOLD|headFreeMode<<BOXHEADFREE|
-                          passThruMode<<BOXPASSTHRU|rcOptions[BOXBEEPERON]<<BOXBEEPERON);
-              tailSerialReply();break;
-            case MSP_RAW_IMU:
-              headSerialReply(c,18);
-              for(i=0;i<3;i++) serialize16(accSmooth[i]);
-              for(i=0;i<3;i++) serialize16(gyroData[i]);
-              for(i=0;i<3;i++) serialize16(magADC[i]);
-              tailSerialReply();break;
-            case MSP_SERVO:
-              headSerialReply(c,16);
-              for(i=0;i<8;i++) serialize16(servo[i]);
-              tailSerialReply();break;
-            case MSP_MOTOR:
-              headSerialReply(c,16);
-              for(i=0;i<8;i++) serialize16(motor[i]);
-              tailSerialReply();break;
-            case MSP_RC:
-              headSerialReply(c,16);
-              for(i=0;i<8;i++) serialize16(rcData[i]);
-              tailSerialReply();break;
-            case MSP_RAW_GPS:
-              headSerialReply(c,14);
-              serialize8(GPS_fix);
-              serialize8(GPS_numSat);
-              serialize32(GPS_coord[LAT]);
-              serialize32(GPS_coord[LON]);
-              serialize16(GPS_altitude);
-              serialize16(GPS_speed);
-              tailSerialReply();break;
-            case MSP_COMP_GPS:
-              headSerialReply(c,5);
-              serialize16(GPS_distanceToHome);
-              serialize16(GPS_directionToHome);
-              serialize8(GPS_update);
-              tailSerialReply();break;
-            case MSP_ATTITUDE:
-              headSerialReply(c,6);
-              for(i=0;i<2;i++) serialize16(angle[i]);
-              serialize16(heading);
-              tailSerialReply();break;
-            case MSP_ALTITUDE:
-              headSerialReply(c,4);
-              serialize32(EstAlt);
-              tailSerialReply();break;
-            case MSP_BAT:
-              headSerialReply(c,3);
-              serialize8(vbat);
-              serialize16(intPowerMeterSum);
-              tailSerialReply();break;
-            case MSP_RC_TUNING:
-              headSerialReply(c,7);
-              serialize8(conf.rcRate8);
-              serialize8(conf.rcExpo8);
-              serialize8(conf.rollPitchRate);
-              serialize8(conf.yawRate);
-              serialize8(conf.dynThrPID);
-              serialize8(conf.thrMid8);
-              serialize8(conf.thrExpo8);
-              tailSerialReply();break;
-            case MSP_PID:
-              headSerialReply(c,3*PIDITEMS);
-              for(i=0;i<PIDITEMS;i++)    {serialize8(conf.P8[i]);serialize8(conf.I8[i]);serialize8(conf.D8[i]);}
-              tailSerialReply();break;
-            case MSP_BOX:
-              headSerialReply(c,2*CHECKBOXITEMS);
-              for(i=0;i<CHECKBOXITEMS;i++)    {serialize16(conf.activate[i]);}
-              tailSerialReply();break;
-            case MSP_MISC:
-              headSerialReply(c,2);
-              serialize16(intPowerTrigger1);
-              tailSerialReply();break;
-            case MSP_MOTOR_PINS:
-              headSerialReply(c,8);
-              for(i=0;i<8;i++) {serialize8(PWM_PIN[i]);}
-              tailSerialReply();break;
-            case MSP_RESET_CONF:
-              conf.checkNewConf++;checkFirstTime();break;
-            case MSP_ACC_CALIBRATION:
-              calibratingA=400;break;
-            case MSP_MAG_CALIBRATION:
-              calibratingM=1;break;
-            case MSP_EEPROM_WRITE:
-              writeParams(0);break;
-            case MSP_DEBUG:
-              headSerialReply(c,8);
-              serialize16(debug1); // 4 variables are here for general monitoring purpose
-              serialize16(debug2);
-              serialize16(debug3);
-              serialize16(debug4);
-              tailSerialReply();break;
-          }
-          stateMSP=0;                              // we reset the protocol state for the next loop
-        }
-      } else {
-        switch(c) {                                // header detection $MW<
-          case '$':
-            if (stateMSP == 0) stateMSP++; break;  // first octet ok, no need to go further
-          case 'M':
-            if (stateMSP == 1) stateMSP++; break;  // second octet ok, no need to go further
-          case '<':
-            if (stateMSP == 2) stateMSP++; break;  // third octet ok, no need to go further
-        }
-      }
-    }
-    if (stateMSP == 0) {                           // still compliant with older single octet command
-      oldSerialCom(c);
+      c_state = IDLE;
     }
   }
 }
 
-void oldSerialCom(uint8_t sr) {
-  //last things to clean
-  switch (sr) {
-    #ifdef LCD_TELEMETRY
-    case 'A': // button A press
-      toggle_telemetry(1);
-      break;
-    case 'B': // button B press
-      toggle_telemetry(2);
-      break;
-    case 'C': // button C press
-      toggle_telemetry(3);
-      break;
-    case 'D': // button D press
-      toggle_telemetry(4);
-      break;
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
-    #if defined(LOG_VALUES) && defined(DEBUG)
-    case 'R':
-    #endif
-    #ifdef DEBUG
-    case 'F':
-    #endif
-      toggle_telemetry(sr);
-      break;
-    case 'a': // button A release
-    case 'b': // button B release
-    case 'c': // button C release
-    case 'd': // button D release
-      break;      
-    #endif // LCD_TELEMETRY
+void evaluateCommand() {
+  switch(cmdMSP) {
+   case MSP_SET_RAW_RC:
+     for(uint8_t i=0;i<8;i++) {
+       rcData[i] = read16();
+     }
+     headSerialReply(0);
+     break;
+   case MSP_SET_RAW_GPS:
+     f.GPS_FIX = read8();
+     GPS_numSat = read8();
+     GPS_coord[LAT] = read32();
+     GPS_coord[LON] = read32();
+     GPS_altitude = read16();
+     GPS_speed = read16();
+     GPS_update |= 2; break;              // New data signalisation to GPS functions
+     headSerialReply(0);
+     break;
+   case MSP_SET_PID:
+     for(uint8_t i=0;i<PIDITEMS;i++) {
+       conf.P8[i]=read8();
+       conf.I8[i]=read8();
+       conf.D8[i]=read8();
+     }
+     headSerialReply(0);
+     break;
+   case MSP_SET_BOX:
+     for(uint8_t i=0;i<CHECKBOXITEMS;i++) {
+       conf.activate[i]=read16();
+     }
+     headSerialReply(0);
+     break;
+   case MSP_SET_RC_TUNING:
+     conf.rcRate8 = read8();
+     conf.rcExpo8 = read8();
+     conf.rollPitchRate = read8();
+     conf.yawRate = read8();
+     conf.dynThrPID = read8();
+     conf.thrMid8 = read8();
+     conf.thrExpo8 = read8();
+     headSerialReply(0);
+     break;
+   case MSP_SET_MISC:
+     #if defined(POWERMETER)
+       conf.powerTrigger1 = read16() / PLEVELSCALE;
+     #endif
+     headSerialReply(0);
+     break;
+   case MSP_IDENT:
+     headSerialReply(7);
+     serialize8(VERSION);   // multiwii version
+     serialize8(MULTITYPE); // type of multicopter
+     serialize8(0);         // MultiWii Serial Protocol Version
+     serialize32(0);        // "capability"
+     break;
+   case MSP_STATUS:
+     headSerialReply(10);
+     serialize16(cycleTime);
+     serialize16(i2c_errors_count);
+     serialize16(ACC|BARO<<1|MAG<<2|GPS<<3|SONAR<<4);
+     serialize32(f.ACC_MODE<<BOXACC|f.BARO_MODE<<BOXBARO|f.MAG_MODE<<BOXMAG|f.ARMED<<BOXARM|
+                 f.GPS_HOME_MODE<<BOXGPSHOME|f.GPS_HOLD_MODE<<BOXGPSHOLD|f.HEADFREE_MODE<<BOXHEADFREE|
+                 f.PASSTHRU_MODE<<BOXPASSTHRU|rcOptions[BOXBEEPERON]<<BOXBEEPERON|rcOptions[BOXLEDMAX]<<BOXLEDMAX|rcOptions[BOXLLIGHTS]<<BOXLLIGHTS|rcOptions[BOXHEADADJ]<<BOXHEADADJ);
+     break;
+   case MSP_RAW_IMU:
+     headSerialReply(18);
+     for(uint8_t i=0;i<3;i++) serialize16(accSmooth[i]);
+     for(uint8_t i=0;i<3;i++) serialize16(gyroData[i]);
+     for(uint8_t i=0;i<3;i++) serialize16(magADC[i]);
+     break;
+   case MSP_SERVO:
+     headSerialReply(16);
+     for(uint8_t i=0;i<8;i++)
+       #if defined(SERVO)
+       serialize16(servo[i]);
+       #else
+       serialize16(0);
+       #endif
+     break;
+   case MSP_MOTOR:
+     headSerialReply(16);
+     for(uint8_t i=0;i<8;i++) {
+       serialize16( (i < NUMBER_MOTOR) ? motor[i] : 0 );
+     }
+     break;
+   case MSP_RC:
+     headSerialReply(16);
+     for(uint8_t i=0;i<8;i++) serialize16(rcData[i]);
+     break;
+   case MSP_RAW_GPS:
+     headSerialReply(14);
+     serialize8(f.GPS_FIX);
+     serialize8(GPS_numSat);
+     serialize32(GPS_coord[LAT]);
+     serialize32(GPS_coord[LON]);
+     serialize16(GPS_altitude);
+     serialize16(GPS_speed);
+     break;
+   case MSP_COMP_GPS:
+     headSerialReply(5);
+     serialize16(GPS_distanceToHome);
+     serialize16(GPS_directionToHome);
+     serialize8(GPS_update & 1);
+     break;
+   case MSP_ATTITUDE:
+     headSerialReply(8);
+     for(uint8_t i=0;i<2;i++) serialize16(angle[i]);
+     serialize16(heading);
+     serialize16(headFreeModeHold);
+     break;
+   case MSP_ALTITUDE:
+     headSerialReply(4);
+     serialize32(EstAlt);
+     break;
+   case MSP_BAT:
+     headSerialReply(3);
+     serialize8(vbat);
+     serialize16(intPowerMeterSum);
+     break;
+   case MSP_RC_TUNING:
+     headSerialReply(7);
+     serialize8(conf.rcRate8);
+     serialize8(conf.rcExpo8);
+     serialize8(conf.rollPitchRate);
+     serialize8(conf.yawRate);
+     serialize8(conf.dynThrPID);
+     serialize8(conf.thrMid8);
+     serialize8(conf.thrExpo8);
+     break;
+   case MSP_PID:
+     headSerialReply(3*PIDITEMS);
+     for(uint8_t i=0;i<PIDITEMS;i++) {
+       serialize8(conf.P8[i]);
+       serialize8(conf.I8[i]);
+       serialize8(conf.D8[i]);
+     }
+     break;
+   case MSP_BOX:
+     headSerialReply(2*CHECKBOXITEMS);
+     for(uint8_t i=0;i<CHECKBOXITEMS;i++) {
+       serialize16(conf.activate[i]);
+     }
+     break;
+   case MSP_BOXNAMES:
+     headSerialReply(strlen_P(boxnames));
+     serializeNames(boxnames);
+     break;
+   case MSP_PIDNAMES:
+     headSerialReply(strlen_P(pidnames));
+     serializeNames(pidnames);
+     break;
+   case MSP_MISC:
+     headSerialReply(2);
+     serialize16(intPowerTrigger1);
+     break;
+   case MSP_MOTOR_PINS:
+     headSerialReply(8);
+     for(uint8_t i=0;i<8;i++) {
+       serialize8(PWM_PIN[i]);
+     }
+     break;
+   case MSP_RESET_CONF:
+     conf.checkNewConf++;
+     checkFirstTime();
+     headSerialReply(0);
+     break;
+   case MSP_ACC_CALIBRATION:
+     calibratingA=400;
+     headSerialReply(0);
+     break;
+   case MSP_MAG_CALIBRATION:
+     f.CALIBRATE_MAG = 1;
+     headSerialReply(0);
+     break;
+   case MSP_EEPROM_WRITE:
+     writeParams(0);
+     headSerialReply(0);
+     break;
+   case MSP_DEBUG:
+     headSerialReply(8);
+     for(uint8_t i=0;i<4;i++) {
+       serialize16(debug[i]); // 4 variables are here for general monitoring purpose
+     }
+     break;
+   default:  // we do not know how to handle the (valid) message, indicate error
+     headSerialError(0);
+     break;
   }
+  tailSerialReply();
+  #if !defined(PROMICRO)
+    UCSR0B |= (1<<UDRIE0); // enable transmitter UDRE interrupt if deactivacted
+  #endif
 }
 
 // *******************************************************
@@ -307,38 +355,36 @@ void oldSerialCom(uint8_t sr) {
 // *******************************************************
 // Interrupt driven UART transmitter - using a ring buffer
 // *******************************************************
-static uint8_t headTX,tailTX;
-static uint8_t bufTX[256];      // 256 is choosen to avoid modulo operations on 8 bits pointers
 
 void serialize32(uint32_t a) {
-  static uint8_t t;
-  t = a;       bufTX[headTX++] = t ; checksum ^= t;
-  t = a>>8;    bufTX[headTX++] = t ; checksum ^= t;
-  t = a>>16;   bufTX[headTX++] = t ; checksum ^= t;
-  t = a>>24;   bufTX[headTX++] = t ; checksum ^= t;
-  #if !defined(PROMICRO)
-    UCSR0B |= (1<<UDRIE0);      // in case ISR_UART desactivates the interrupt, we force its reactivation anyway
-  #endif 
+  serialize8((a    ) & 0xFF);
+  serialize8((a>> 8) & 0xFF);
+  serialize8((a>>16) & 0xFF);
+  serialize8((a>>24) & 0xFF);
 }
+
 void serialize16(int16_t a) {
-  static uint8_t t;
-  t = a;          bufTX[headTX++] = t ; checksum ^= t;
-  t = a>>8&0xff;  bufTX[headTX++] = t ; checksum ^= t;
-  #if !defined(PROMICRO)
-    UCSR0B |= (1<<UDRIE0);
-  #endif 
+  serialize8((a   ) & 0xFF);
+  serialize8((a>>8) & 0xFF);
 }
-void serialize8(uint8_t a)  {
-  bufTX[headTX++]  = a; checksum ^= a;
-  #if !defined(PROMICRO)
-    UCSR0B |= (1<<UDRIE0);
-  #endif
+
+void serialize8(uint8_t a) {
+  uint8_t t = headTX;
+  if (++t >= TX_BUFFER_SIZE) t = 0;
+  bufTX[t] = a;
+  checksum ^= a;
+  headTX = t;
 }
 
 #if !defined(PROMICRO)
   ISR_UART {
-    if (headTX != tailTX) UDR0 = bufTX[tailTX++];  // Transmit next byte in the ring
-    if (tailTX == headTX) UCSR0B &= ~(1<<UDRIE0); // Check if all data is transmitted . if yes disable transmitter UDRE interrupt
+    uint8_t t = tailTX;
+    if (headTX != t) {
+      if (++t >= TX_BUFFER_SIZE) t = 0;
+      UDR0 = bufTX[t];  // Transmit next byte in the ring
+      tailTX = t;
+    }
+    if (t == headTX) UCSR0B &= ~(1<<UDRIE0); // Check if all data is transmitted . if yes disable transmitter UDRE interrupt
   }
 #endif
 
@@ -353,7 +399,7 @@ void UartSendData() {
   #endif
 }
 
-void SerialOpen(uint8_t port, uint32_t baud) {
+static void inline SerialOpen(uint8_t port, uint32_t baud) {
   uint8_t h = ((F_CPU  / 4 / baud -1) / 2) >> 8;
   uint8_t l = ((F_CPU  / 4 / baud -1) / 2);
   switch (port) {
@@ -374,7 +420,7 @@ void SerialOpen(uint8_t port, uint32_t baud) {
   }
 }
 
-void SerialEnd(uint8_t port) {
+static void inline SerialEnd(uint8_t port) {
   switch (port) {
     #if !defined(PROMICRO)
     case 0: UCSR0B &= ~((1<<RXEN0)|(1<<TXEN0)|(1<<RXCIE0)|(1<<UDRIE0)); break;
@@ -389,37 +435,25 @@ void SerialEnd(uint8_t port) {
   }
 }
 
-#if defined(PROMINI) && !(defined(SPEKTRUM))
-ISR(USART_RX_vect){
-  uint8_t d = UDR0;
-  uint8_t i = serialHeadRX[0] + 1;
-  if (i != serialTailRX[0]) {serialBufferRX[serialHeadRX[0]][0] = d; serialHeadRX[0] = i;}
+static void inline store_uart_in_buf(uint8_t data, uint8_t portnum) {
+  uint8_t h = serialHeadRX[portnum];
+  if (++h >= RX_BUFFER_SIZE) h = 0;
+  if (h == serialTailRX[portnum]) return; // we did not bite our own tail?
+  serialBufferRX[serialHeadRX[portnum]][portnum] = data;
+  serialHeadRX[portnum] = h;
 }
+
+#if defined(PROMINI) && !(defined(SPEKTRUM))
+  ISR(USART_RX_vect)  { store_uart_in_buf(UDR0, 0); }
 #endif
 
 #if (defined(MEGA) || defined(PROMICRO)) && !defined(SPEKTRUM)
-  ISR(USART1_RX_vect){
-    uint8_t d = UDR1;
-    uint8_t i = serialHeadRX[1] + 1;
-    if (i != serialTailRX[1]) {serialBufferRX[serialHeadRX[1]][1] = d; serialHeadRX[1] = i;}
-  }
+  ISR(USART1_RX_vect) { store_uart_in_buf(UDR1, 1); }
 #endif
 #if defined(MEGA)
-  ISR(USART0_RX_vect){
-    uint8_t d = UDR0;
-    uint8_t i = serialHeadRX[0] + 1;
-    if (i != serialTailRX[0]) {serialBufferRX[serialHeadRX[0]][0] = d; serialHeadRX[0] = i;}
-  }
-  ISR(USART2_RX_vect){
-    uint8_t d = UDR2;
-    uint8_t i = serialHeadRX[2] + 1;
-    if (i != serialTailRX[2]) {serialBufferRX[serialHeadRX[2]][2] = d; serialHeadRX[2] = i;}
-  }
-  ISR(USART3_RX_vect){
-    uint8_t d = UDR3;
-    uint8_t i = serialHeadRX[3] + 1;
-    if (i != serialTailRX[3]) {serialBufferRX[serialHeadRX[3]][3] = d; serialHeadRX[3] = i;}
-  }
+  ISR(USART0_RX_vect) { store_uart_in_buf(UDR0, 0); }
+  ISR(USART2_RX_vect) { store_uart_in_buf(UDR2, 2); }
+  ISR(USART3_RX_vect) { store_uart_in_buf(UDR3, 3); }
 #endif
 
 uint8_t SerialRead(uint8_t port) {
@@ -434,8 +468,12 @@ uint8_t SerialRead(uint8_t port) {
     #endif
     port = 0;
   #endif
-  uint8_t c = serialBufferRX[serialTailRX[port]][port];
-  if ((serialHeadRX[port] != serialTailRX[port])) serialTailRX[port] = serialTailRX[port] + 1;
+  uint8_t t = serialTailRX[port];
+  uint8_t c = serialBufferRX[t][port];
+  if (serialHeadRX[port] != t) {
+    if (++t >= RX_BUFFER_SIZE) t = 0;
+    serialTailRX[port] = t;
+  }
   return c;
 }
 
@@ -448,7 +486,7 @@ uint8_t SerialAvailable(uint8_t port) {
     #endif
     port = 0;
   #endif
-  return serialHeadRX[port] - serialTailRX[port];
+  return (serialHeadRX[port] != serialTailRX[port]);
 }
 
 void SerialWrite(uint8_t port,uint8_t c){

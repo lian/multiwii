@@ -290,8 +290,9 @@ void writeMotors() { // [1000;2000] => [125;250]
 /************          Writes the mincommand to all Motors           ******************/
 /**************************************************************************************/
 void writeAllMotors(int16_t mc) {   // Sends commands to all motors
-  for (uint8_t i =0;i<NUMBER_MOTOR;i++)
+  for (uint8_t i =0;i<NUMBER_MOTOR;i++) {
     motor[i]=mc;
+  }
   writeMotors();
 }
 
@@ -301,8 +302,9 @@ void writeAllMotors(int16_t mc) {   // Sends commands to all motors
 void initOutput() {
   
 /****************            mark all PWM pins as Output             ******************/
-  for(uint8_t i=0;i<NUMBER_MOTOR;i++)
+  for(uint8_t i=0;i<NUMBER_MOTOR;i++) {
     pinMode(PWM_PIN[i],OUTPUT);
+  }
     
 /****************  Specific PWM Timers & Registers for the MEGA's    ******************/
   #if defined(MEGA)
@@ -867,7 +869,7 @@ void mixTable() {
   #endif
   #if defined(FLYING_WING)
     motor[0] = rcCommand[THROTTLE];
-    if (passThruMode) {// do not use sensors for correction, simple 2 channel mixing
+    if (f.PASSTHRU_MODE) {// do not use sensors for correction, simple 2 channel mixing
        servo[0]  = PITCH_DIRECTION_L * (rcData[PITCH]-MIDRC) + ROLL_DIRECTION_L * (rcData[ROLL]-MIDRC);
        servo[1]  = PITCH_DIRECTION_R * (rcData[PITCH]-MIDRC) + ROLL_DIRECTION_R * (rcData[ROLL]-MIDRC);
     } else { // use sensors to correct (gyro only or gyro+acc according to aux1/aux2 configuration
@@ -900,32 +902,52 @@ void mixTable() {
     // servo[7] is programmed with safty features to avoid motorstarts when ardu reset..  
     // All other servos go to center at reset..  Half throttle can be dangerus    
     // Only use servo[7] as motorcontrol if motor is used in the setup            */
-    if (!armed){ 
+    if (!f.ARMED){ 
       servo[7] =  MINCOMMAND; // Kill throttle when disarmed
     } else {   
       servo[7] =  rcData[THROTTLE];
     }
 
     // Flapperon Controll
-    int16_t flaps[2]={0,0};    
-  #if  defined(FLAP_CHANNEL) && defined(FLAP_EP) && defined(FLAP_INVERT)  
-    int8_t flapinv[2] = FLAP_INVERT; 
-    static int16_t F_Endpoint[2] = FLAP_EP;
-    int16_t flap = (MIDRC- constrain(rcData[FLAP_CHANNEL],F_Endpoint[0],F_Endpoint[1]));
-    for(i=0; i<2; i++){flaps[i] = flap * flapinv[i] ;}
-  #endif
+    int16_t flapperons[2]={0,0};    
+    #if  defined(FLAPPERONS) && defined(FLAPPERON_EP)
+      int8_t flapinv[2] = FLAPPERON_INVERT; 
+      static int16_t F_Endpoint[2] = FLAPPERON_EP;
+      int16_t flap =MIDRC-constrain(rcData[FLAPPERONS],F_Endpoint[1],F_Endpoint[0]);
+      static int16_t slowFlaps= flap;
+      #if defined(FLAPSPEED)
+        if (slowFlaps < flap ){slowFlaps+=FLAPSPEED;}else if(slowFlaps > flap){slowFlaps-=FLAPSPEED;}
+      #else
+        slowFlaps = flap;
+      #endif      
+      flap = MIDRC-(constrain(MIDRC-slowFlaps,F_Endpoint[0],F_Endpoint[1]));      
+    for(i=0; i<2; i++){flapperons[i] = flap * flapinv[i] ;}
+    #endif
+    
+    // Traditional Flaps on A2
+    #if defined(FLAPS)  && defined(FLAP_EP)
+      static int16_t lF_Endpoint[2] = FLAP_EP;
+      int16_t lFlap = MIDRC-constrain(rcData[FLAPS],lF_Endpoint[0],lF_Endpoint[1]);
+      static int16_t slow_LFlaps= lFlap;
+      #if defined(FLAPSPEED)
+        if (slow_LFlaps < lFlap ){slow_LFlaps+=FLAPSPEED;}else if(slow_LFlaps > lFlap){slow_LFlaps-=FLAPSPEED;}
+      #else
+        slow_LFlaps = lFlap;
+      #endif
+      servo[2]    =  servoMid[2]+(slow_LFlaps *servoReverse[2]);
+    #endif
 
-    if(passThruMode){   // Direct passthru from RX 
-      servo[3]  = servoMid[3]+((rcCommand[ROLL] + flaps[0]) *servoReverse[3]);     //   Wing 1
-      servo[4]  = servoMid[4]+((rcCommand[ROLL] + flaps[1]) *servoReverse[4]);     //   Wing 2
-      servo[5]  = servoMid[5]+(rcCommand[YAW]               *servoReverse[5]);     //   Rudder
-      servo[6]  = servoMid[6]+(rcCommand[PITCH]             *servoReverse[6]);     //   Elevator 
+    if(f.PASSTHRU_MODE){   // Direct passthru from RX 
+      servo[3]  = servoMid[3]+((rcCommand[ROLL] + flapperons[0]) *servoReverse[3]);     //   Wing 1
+      servo[4]  = servoMid[4]+((rcCommand[ROLL] + flapperons[1]) *servoReverse[4]);     //   Wing 2
+      servo[5]  = servoMid[5]+(rcCommand[YAW]                    *servoReverse[5]);     //   Rudder
+      servo[6]  = servoMid[6]+(rcCommand[PITCH]                  *servoReverse[6]);     //   Elevator 
     }else{
       // Assisted modes (gyro only or gyro+acc according to AUX configuration in Gui
-      servo[3]  =(servoMid[3] + ((axisPID[ROLL] + flaps[0]) *servoReverse[3]));   //   Wing 1 
-      servo[4]  =(servoMid[4] + ((axisPID[ROLL] + flaps[1]) *servoReverse[4]));   //   Wing 2
-      servo[5]  =(servoMid[5] + (axisPID[YAW]               *servoReverse[5]));   //   Rudder
-      servo[6]  =(servoMid[6] + (axisPID[PITCH]             *servoReverse[6]));   //   Elevator
+      servo[3]  =(servoMid[3] + ((axisPID[ROLL] + flapperons[0]) *servoReverse[3]));   //   Wing 1 
+      servo[4]  =(servoMid[4] + ((axisPID[ROLL] + flapperons[1]) *servoReverse[4]));   //   Wing 2
+      servo[5]  =(servoMid[5] + (axisPID[YAW]                    *servoReverse[5]));   //   Rudder
+      servo[6]  =(servoMid[6] + (axisPID[PITCH]                  *servoReverse[6]));   //   Elevator
     } 
     // ServoRates
     for(i=3;i<8;i++){
@@ -961,7 +983,7 @@ void mixTable() {
       collective = collect * (collRange[0]*0.01); 
     } 
 
-    if(passThruMode){ // Use Rcdata Without sensors
+    if(f.PASSTHRU_MODE){ // Use Rcdata Without sensors
       heliRoll=  rcCommand[ROLL] ;
       heliNick=  rcCommand[PITCH];
     } else{ // Assisted modes
@@ -982,7 +1004,7 @@ void mixTable() {
   /* Throttle & YAW
   ********************
   Handeled in common functions for Heli */
-    if (!armed){ 
+    if (!f.ARMED){ 
       servo[7] = 900; // Kill throttle when disarmed
       if (YAWMOTOR){servo[5] =  MINCOMMAND;} else {servo[5] =  yawControll; } // Kill YAWMOTOR when disarmed
     }else {   
@@ -1062,7 +1084,7 @@ void mixTable() {
       #else
         motor[i] = MINCOMMAND;
       #endif
-    if (armed == 0)
+    if (!f.ARMED)
       motor[i] = MINCOMMAND;
   }
   /****************                      Powermeter Log                    ******************/
