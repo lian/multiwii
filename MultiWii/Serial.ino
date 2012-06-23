@@ -17,6 +17,9 @@ static volatile uint8_t headTX,tailTX;
 static uint8_t bufTX[TX_BUFFER_SIZE];
 static uint8_t inBuf[INBUF_SIZE];
 
+// Multiwii Serial Protocol 0 
+#define MSP_VERSION				 0
+
 #define MSP_IDENT                100   //out message         multitype + multiwii version + protocol version + capability variable
 #define MSP_STATUS               101   //out message         cycletime & errors_count & sensor present & box activation
 #define MSP_RAW_IMU              102   //out message         9 DOF
@@ -161,7 +164,7 @@ void evaluateCommand() {
      GPS_coord[LON] = read32();
      GPS_altitude = read16();
      GPS_speed = read16();
-     GPS_update |= 2; break;              // New data signalisation to GPS functions
+     GPS_update |= 2;              // New data signalisation to GPS functions
      headSerialReply(0);
      break;
    case MSP_SET_PID:
@@ -198,7 +201,7 @@ void evaluateCommand() {
      headSerialReply(7);
      serialize8(VERSION);   // multiwii version
      serialize8(MULTITYPE); // type of multicopter
-     serialize8(0);         // MultiWii Serial Protocol Version
+     serialize8(MSP_VERSION);         // MultiWii Serial Protocol Version
      serialize32(0);        // "capability"
      break;
    case MSP_STATUS:
@@ -207,6 +210,7 @@ void evaluateCommand() {
      serialize16(i2c_errors_count);
      serialize16(ACC|BARO<<1|MAG<<2|GPS<<3|SONAR<<4);
      serialize32(f.ACC_MODE<<BOXACC|f.BARO_MODE<<BOXBARO|f.MAG_MODE<<BOXMAG|f.ARMED<<BOXARM|
+                 rcOptions[BOXCAMSTAB]<<BOXCAMSTAB | rcOptions[BOXCAMTRIG]<<BOXCAMTRIG |
                  f.GPS_HOME_MODE<<BOXGPSHOME|f.GPS_HOLD_MODE<<BOXGPSHOLD|f.HEADFREE_MODE<<BOXHEADFREE|
                  f.PASSTHRU_MODE<<BOXPASSTHRU|rcOptions[BOXBEEPERON]<<BOXBEEPERON|rcOptions[BOXLEDMAX]<<BOXLEDMAX|rcOptions[BOXLLIGHTS]<<BOXLLIGHTS|rcOptions[BOXHEADADJ]<<BOXHEADADJ);
      break;
@@ -330,7 +334,7 @@ void evaluateCommand() {
        serialize16(debug[i]); // 4 variables are here for general monitoring purpose
      }
      break;
-   default:  // we do not know how to handle the (valid) message, indicate error
+   default:  // we do not know how to handle the (valid) message, indicate error MSP $M!
      headSerialError(0);
      break;
   }
@@ -390,12 +394,15 @@ void serialize8(uint8_t a) {
 
 void UartSendData() {
   #if defined(PROMICRO)
-    #if !defined(TEENSY20)
-      USB_Send(USB_CDC_TX,bufTX,headTX);
-    #else
-      Serial.write(bufTX, headTX);
-    #endif
-    headTX = 0;
+    while(headTX != tailTX) {
+      if (++tailTX >= TX_BUFFER_SIZE) tailTX = 0;
+      uint8_t* p = bufTX+tailTX;
+      #if !defined(TEENSY20)
+        USB_Send(USB_CDC_TX,p,1);
+      #else
+        Serial.write(p,1);
+      #endif
+    }
   #endif
 }
 
