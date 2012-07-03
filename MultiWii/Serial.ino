@@ -38,6 +38,7 @@ static uint8_t inBuf[INBUF_SIZE];
 #define MSP_MOTOR_PINS           115   //out message         which pins are in use for motors & servos, for GUI 
 #define MSP_BOXNAMES             116   //out message         the aux switch names
 #define MSP_PIDNAMES             117   //out message         the PID names
+#define MSP_WP                   118   //out message         get a WP, WP# is in the payload, returns (WP#, lat, lon, alt, flags) WP#0-home, WP#16-poshold
 
 #define MSP_SET_RAW_RC           200   //in message          8 rc chan
 #define MSP_SET_RAW_GPS          201   //in message          fix, numsat, lat, lon, alt, speed
@@ -48,6 +49,7 @@ static uint8_t inBuf[INBUF_SIZE];
 #define MSP_MAG_CALIBRATION      206   //in message          no param
 #define MSP_SET_MISC             207   //in message          powermeter trig + 8 free for future use
 #define MSP_RESET_CONF           208   //in message          no param
+#define MSP_WP_SET               209   //in message          sets a given WP (WP#,lat, lon, alt, flags)
 
 #define MSP_EEPROM_WRITE         250   //in message          no param
 
@@ -118,6 +120,7 @@ void serialCom() {
 
     if (c_state == IDLE) {
       c_state = (c=='$') ? HEADER_START : IDLE;
+      if (c_state == IDLE) evaluateOtherData(c); // evaluate all other incoming serial data
     } else if (c_state == HEADER_START) {
       c_state = (c=='M') ? HEADER_M : IDLE;
     } else if (c_state == HEADER_M) {
@@ -311,6 +314,30 @@ void evaluateCommand() {
        serialize8(PWM_PIN[i]);
      }
      break;
+
+#if defined(USE_MSP_WP)    
+   case MSP_WP:
+     {
+      uint8_t wp_no = read8();    //get the wp number  
+      headSerialReply(12);
+      if (wp_no == 0) {
+        serialize8(0);                   //wp0
+        serialize32(GPS_home[LAT]);
+        serialize32(GPS_home[LON]);
+        serialize16(0);                  //altitude will come here 
+        serialize8(0);                   //nav flag will come here
+      } else if (wp_no == 16)
+      {
+        serialize8(16);                  //wp16
+        serialize32(GPS_hold[LAT]);
+        serialize32(GPS_hold[LON]);
+        serialize16(0);                  //altitude will come here 
+        serialize8(0);                   //nav flag will come here
+      } 
+     }
+     break;  
+#endif	 
+	 
    case MSP_RESET_CONF:
      conf.checkNewConf++;
      checkFirstTime();
@@ -339,9 +366,57 @@ void evaluateCommand() {
      break;
   }
   tailSerialReply();
-  #if !defined(PROMICRO)
-    UCSR0B |= (1<<UDRIE0); // enable transmitter UDRE interrupt if deactivacted
-  #endif
+}
+
+// evaluate all other incoming serial data
+void evaluateOtherData(uint8_t sr) {
+  switch (sr) {
+  // Note: we may receive weird characters here which could trigger unwanted features during flight.
+  //       this could lead to a crash easily.
+  //       Please use if (!f.ARMED) where neccessary
+    #ifdef LCD_CONF
+    case 's':
+    case 'S':
+      if (!f.ARMED) configurationLoop();
+      break;
+    #endif
+    #ifdef LCD_TELEMETRY
+    case 'A': // button A press
+      toggle_telemetry(1);
+      break;
+    case 'B': // button B press
+      toggle_telemetry(2);
+      break;
+    case 'C': // button C press
+      toggle_telemetry(3);
+      break;
+    case 'D': // button D press
+      toggle_telemetry(4);
+      break;
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+    #if defined(LOG_VALUES) && defined(DEBUG)
+    case 'R':
+    #endif
+    #ifdef DEBUG
+    case 'F':
+    #endif
+      toggle_telemetry(sr);
+      break;
+    case 'a': // button A release
+    case 'b': // button B release
+    case 'c': // button C release
+    case 'd': // button D release
+      break;
+    #endif // LCD_TELEMETRY
+  }
 }
 
 // *******************************************************
@@ -403,6 +478,8 @@ void UartSendData() {
         Serial.write(p,1);
       #endif
     }
+  #else
+    UCSR0B |= (1<<UDRIE0); // enable transmitter UDRE interrupt if deactivacted
   #endif
 }
 
@@ -413,8 +490,8 @@ static void inline SerialOpen(uint8_t port, uint32_t baud) {
     #if !defined(PROMICRO)
     case 0: UCSR0A  = (1<<U2X0); UBRR0H = h; UBRR0L = l; UCSR0B |= (1<<RXEN0)|(1<<TXEN0)|(1<<RXCIE0); break;
     #else
-      #if (ARDUINO > 100) && !defined(TEENSY20)
-        case 0: UDIEN &= ~(1<<SOFE); // disable the USB frame interrupt of arduino (it causes strong jitter and we dont need it)
+      #if (ARDUINO >= 100) && !defined(TEENSY20)
+        case 0: UDIEN &= ~(1<<SOFE); break;// disable the USB frame interrupt of arduino (it causes strong jitter and we dont need it)
       #endif
     #endif
     #if defined(MEGA) || defined(PROMICRO)
@@ -468,7 +545,7 @@ uint8_t SerialRead(uint8_t port) {
      #if defined(TEENSY20)
       if(port == 0) return Serial.read();
     #else
-      #if (ARDUINO > 100)
+      #if (ARDUINO >= 100)
         USB_Flush(USB_CDC_TX);
       #endif
       if(port == 0) return USB_Recv(USB_CDC_RX);      
@@ -489,7 +566,7 @@ uint8_t SerialAvailable(uint8_t port) {
     #if !defined(TEENSY20)
       if(port == 0) return USB_Available(USB_CDC_RX);
     #else
-      if(port == 0) return T_USB_Available(USB_CDC_RX);
+      if(port == 0) return T_USB_Available();
     #endif
     port = 0;
   #endif
