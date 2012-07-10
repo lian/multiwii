@@ -185,21 +185,41 @@ void writeMotors() { // [1000;2000] => [125;250]
 /******** Specific PWM Timers & Registers for the atmega32u4 (Promicro)   ************/
   #if defined(PROMICRO)
     #if (NUMBER_MOTOR > 0) // Timer 1 A & B [1000:2000] => [8000:16000]
-      OCR1A = motor[0]<<3; //  pin 9
+      #ifndef EXT_MOTOR_RANGE 
+        OCR1A = motor[0]<<3; //  pin 9
+      #else
+        OCR1A = ((motor[0]<<4) - 16000) + 128;
+      #endif
     #endif
     #if (NUMBER_MOTOR > 1)
-      OCR1B = motor[1]<<3; //  pin 10
+      #ifndef EXT_MOTOR_RANGE 
+        OCR1B = motor[1]<<3; //  pin 10
+      #else
+        OCR1B = ((motor[1]<<4) - 16000) + 128;
+      #endif
     #endif
     #if (NUMBER_MOTOR > 2) // Timer 4 A & D [1000:2000] => [1000:2000]
       #if !defined(HWPWM6)
         // to write values > 255 to timer 4 A/B we need to split the bytes
-        TC4H = (2047-motor[2])>>8; OCR4A = ((2047-motor[2])&0xFF); //  pin 5
+        #ifndef EXT_MOTOR_RANGE 
+          TC4H = (2047-motor[2])>>8; OCR4A = ((2047-motor[2])&0xFF); //  pin 5
+        #else
+          TC4H = 2047-(((motor[2]-1000)<<1)+16)>>8; OCR4A = (2047-(((motor[2]-1000)<<1)+16)&0xFF); //  pin 5
+        #endif
       #else
-        OCR3A = motor[2]<<3; //  pin 5
+        #ifndef EXT_MOTOR_RANGE 
+          OCR3A = motor[2]<<3; //  pin 5
+        #else
+          OCR3A = ((motor[2]<<4) - 16000) + 128;
+        #endif
       #endif
     #endif
     #if (NUMBER_MOTOR > 3)
-      TC4H = motor[3]>>8; OCR4D = (motor[3]&0xFF); //  pin 6
+      #ifndef EXT_MOTOR_RANGE 
+        TC4H = motor[3]>>8; OCR4D = (motor[3]&0xFF); //  pin 6
+      #else
+        TC4H = (((motor[3]-1000)<<1)+16)>>8; OCR4D = ((((motor[3]-1000)<<1)+16)&0xFF); //  pin 6
+      #endif
     #endif    
     #if (NUMBER_MOTOR > 4)
       #if !defined(HWPWM6)
@@ -215,8 +235,13 @@ void writeMotors() { // [1000;2000] => [125;250]
           atomicPWM_PIN6_lowState = 15743-atomicPWM_PIN6_highState;        
         #endif
       #else
-        OCR1C = motor[4]<<3; //  pin 11
-        TC4H = motor[5]>>8; OCR4A = (motor[5]&0xFF); //  pin 13    
+        #ifndef EXT_MOTOR_RANGE 
+          OCR1C = motor[4]<<3; //  pin 11
+          TC4H = motor[5]>>8; OCR4A = (motor[5]&0xFF); //  pin 13  
+        #else
+          OCR1C = ((motor[4]<<4) - 16000) + 128;
+          TC4H = (((motor[5]-1000)<<1)+16)>>8; OCR4A = ((((motor[5]-1000)<<1)+16)&0xFF); //  pin 13       
+        #endif  
       #endif
     #endif
     #if (NUMBER_MOTOR > 6)
@@ -422,6 +447,19 @@ void initOutput() {
         pinMode(A0,OUTPUT);pinMode(A1,OUTPUT);
       #endif
     #endif
+  #endif
+
+ /********  special version of MultiWii to calibrate all attached ESCs ************/
+  #if defined(ESC_CALIB_CANNOT_FLY)
+    writeAllMotors(ESC_CALIB_HIGH);
+    delay(3000);
+    writeAllMotors(ESC_CALIB_LOW);
+    delay(500);
+    while (1) {
+      delay(5000);
+      blinkLED(2,20, 2);
+    }
+    exit; // statement never reached
   #endif
   
   writeAllMotors(MINCOMMAND);
@@ -797,18 +835,18 @@ void mixTable() {
     motor[5] = PIDMIX(+1,-2/3,+1); //UNDER_LEFT    
   #endif
   #ifdef HEX6
-    motor[0] = PIDMIX(-1/2,+1/2,+1); //REAR_R
-    motor[1] = PIDMIX(-1/2,-1/2,-1); //FRONT_R
-    motor[2] = PIDMIX(+1/2,+1/2,+1); //REAR_L
-    motor[3] = PIDMIX(+1/2,-1/2,-1); //FRONT_L
+    motor[0] = PIDMIX(-7/8,+1/2,+1); //REAR_R
+    motor[1] = PIDMIX(-7/8,-1/2,-1); //FRONT_R
+    motor[2] = PIDMIX(+7/8,+1/2,+1); //REAR_L
+    motor[3] = PIDMIX(+7/8,-1/2,-1); //FRONT_L
     motor[4] = PIDMIX(+0  ,-1  ,+1); //FRONT
     motor[5] = PIDMIX(+0  ,+1  ,-1); //REAR
   #endif
   #ifdef HEX6X
-    motor[0] = PIDMIX(-1/2,+1/2,+1); //REAR_R
-    motor[1] = PIDMIX(-1/2,-1/2,+1); //FRONT_R
-    motor[2] = PIDMIX(+1/2,+1/2,-1); //REAR_L
-    motor[3] = PIDMIX(+1/2,-1/2,-1); //FRONT_L
+    motor[0] = PIDMIX(-1/2,+7/8,+1); //REAR_R
+    motor[1] = PIDMIX(-1/2,-7/8,+1); //FRONT_R
+    motor[2] = PIDMIX(+1/2,+7/8,-1); //REAR_L
+    motor[3] = PIDMIX(+1/2,-7/8,-1); //FRONT_L
     motor[4] = PIDMIX(-1  ,+0  ,-1); //RIGHT
     motor[5] = PIDMIX(+1  ,+0  ,+1); //LEFT
   #endif
@@ -842,11 +880,11 @@ void mixTable() {
     motor[6] = PIDMIX(-1/2,+1  ,-1); //REAR_R
     motor[7] = PIDMIX(+1  ,+1/2,-1); //MIDREAR_L 
   #endif
-  #ifdef VTAIL4
-    motor[0] = PIDMIX(+0,+1, -1/2); //REAR_R 
-    motor[1] = PIDMIX(-1, -1, +0);  //FRONT_R 
-    motor[2] = PIDMIX(+0,+1, +1/2); //REAR_L 
-    motor[3] = PIDMIX(+1, -1, -0);  //FRONT_L
+  #ifdef VTAIL4 //http://www.multiwii.com/forum/viewtopic.php?f=8&t=1973&start=20#p17816
+    motor[0] = PIDMIX(-1,+1, +1); //REAR_R
+    motor[1] = PIDMIX(-0.64, -0.64, -0.64); //FRONT_R
+    motor[2] = PIDMIX(+1,+1, -1); //REAR_L
+    motor[3] = PIDMIX(+0.64, -0.64, +0.64); //FRONT_L
   #endif
 
   /****************                Cam stabilize Sevos             ******************/

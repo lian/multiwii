@@ -102,6 +102,10 @@ static int16_t  errorAltitudeI = 0;
 #if defined(BUZZER)
   static uint8_t  toggleBeep = 0;
 #endif
+#if defined(ARMEDTIMEWARNING)
+  static uint32_t  ArmedTimeWarningMicroSeconds = 0;
+#endif
+
 static int16_t  debug[4];
 static int16_t  sonarAlt; //to think about the unit
 
@@ -502,18 +506,6 @@ void setup() {
   BUZZERPIN_PINMODE;
   STABLEPIN_PINMODE;
   POWERPIN_OFF;
-  #if defined(ESC_CALIB_CANNOT_FLY) // <- to move in Output.pde, nothing to do here
-    /* this turns into a special version of MultiWii. Its only purpose it to try and calib all attached ESCs */
-    writeAllMotors(ESC_CALIB_HIGH);
-    delay(3000);
-    writeAllMotors(ESC_CALIB_LOW);
-    delay(500);
-    while (1) {
-      delay(5000);
-      blinkLED(2,20, 2);
-    }
-    exit; // statement never reached
-  #endif
   initOutput();
   readEEPROM();
   checkFirstTime();
@@ -533,6 +525,9 @@ void setup() {
   #if defined(POWERMETER)
     for(uint8_t i=0;i<=PMOTOR_SUM;i++)
       pMeter[i]=0;
+  #endif
+  #if defined(ARMEDTIMEWARNING)
+    ArmedTimeWarningMicroSeconds = (ARMEDTIMEWARNING *1000000);
   #endif
   /************************************/
   #if defined(GPS_SERIAL)
