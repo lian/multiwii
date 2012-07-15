@@ -1,5 +1,5 @@
 #if defined(BUZZER)
-static uint8_t buzzerIsOn = 0,blinkdone =0;
+static uint8_t buzzerIsOn = 0,beepDone =0;
 static uint32_t buzzerLastToggleTime;
 uint8_t isBuzzerON() { return buzzerIsOn; } // returns true while buzzer is buzzing; returns 0 for silent periods
 
@@ -69,7 +69,7 @@ void buzzer(uint8_t warn_vbat){
 
 void beep_code(char first, char second, char third, char pause){
   char patternChar[4];
-  uint16_t patternInt[4];
+  uint16_t Duration;
   static uint8_t icnt = 0;
   
   patternChar[0] = first; 
@@ -78,44 +78,36 @@ void beep_code(char first, char second, char third, char pause){
   patternChar[3] = pause;
   switch(patternChar[icnt]) {
     case 'M': 
-      patternInt[icnt] = 100; 
+      Duration = 100; 
       break;
     case 'L': 
-      patternInt[icnt] = 200; 
+      Duration = 200; 
       break;
     case 'D': 
-      patternInt[icnt] = 2000; 
+      Duration = 2000; 
       break;
     case 'N': 
-      patternInt[icnt] = 0; 
+      Duration = 0; 
       break;
     default:
-      patternInt[icnt] = 50; 
+      Duration = 50; 
       break;
   }
-  if(icnt <3 && patternInt[icnt]!=0){
-    beep(patternInt[icnt]);
+    
+  if(icnt <3 && Duration!=0){
+    beep(Duration);
   }
-  if (icnt >=3 && (buzzerLastToggleTime<millis()-patternInt[3]) ){
+  if (icnt >=3 && (buzzerLastToggleTime<millis()-Duration) ){
     icnt=0;
     toggleBeep =0;
   }
-  if (blinkdone == 1 || patternInt[icnt]==0){
-    icnt++;
-    blinkdone=0;      
+  if (beepDone == 1 || Duration==0){
+    if (icnt < 3){icnt++;}
+    beepDone=0;      
     buzzerIsOn = 0;
     BUZZERPIN_OFF;
   }
   
-  
-  
- 
- 
- 
- 
- 
- 
- 
 }
 
 void beep( uint16_t pulse){  
@@ -128,7 +120,7 @@ void beep( uint16_t pulse){
     BUZZERPIN_OFF;
     buzzerLastToggleTime=millis();    
     if (toggleBeep >0) toggleBeep--;    
-    blinkdone =1;
+    beepDone =1;
   }
 } 
 
