@@ -176,7 +176,7 @@ endif
 GLFAG			?=	-g 
 #OFLAG			?=	-Os
 OFLAG			?=	-O1
-DEFINES			=	-DF_CPU=$(F_CPU) -DARDUINO=$(ARDUINO_VERS) $(EXTRAFLAGS)
+DEFINES			=	-DF_CPU=$(F_CPU) -DARDUINO=$(ARDUINO_VERS) $(EXTRAFLAGS) -D__PROG_TYPES_COMPAT__
 OPTFLAGS		=	$(OFLAG) -Wformat -Wall -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wformat=2 -Wno-reorder
 DEPFLAGS		=	-MD -MT $@
 

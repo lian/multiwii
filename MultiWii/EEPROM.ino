@@ -1,6 +1,6 @@
 #include <avr/eeprom.h>
 
-#define EEPROM_CONF_VERSION 161
+#define EEPROM_CONF_VERSION 164
 
 void readEEPROM() {
   uint8_t i;
@@ -19,7 +19,7 @@ void readEEPROM() {
   }
 
   #if defined(POWERMETER)
-    pAlarm = (uint32_t) conf.powerTrigger1 * (uint32_t) PLEVELSCALE * (uint32_t) PLEVELDIV; // need to cast before multiplying
+    pAlarm = (uint32_t) conf.powerTrigger1 * (uint32_t) PLEVELSCALE * (uint32_t) conf.pleveldiv; // need to cast before multiplying
   #endif
   #ifdef FLYING_WING
     #ifdef LCD_CONF
@@ -40,13 +40,25 @@ void readEEPROM() {
   #if GPS
     if (f.I2C_INIT_DONE) GPS_set_pids();
   #endif
+  #ifdef POWERMETER_HARD
+    conf.pleveldivsoft = PLEVELDIVSOFT;
+  #endif
+  #ifdef POWERMETER_SOFT
+     conf.pleveldivsoft = conf.pleveldiv;
+  #endif
 }
 
 void writeParams(uint8_t b) {
   conf.checkNewConf = EEPROM_CONF_VERSION; // make sure we write the current version into eeprom
   eeprom_write_block((const void*)&conf, (void*)0, sizeof(conf));
   readEEPROM();
-  if (b == 1) blinkLED(15,20,1);
+  if (b == 1){ 
+    blinkLED(15,20,1);
+    #if defined(BUZZER)
+      beep_confirmation = 1;
+    #endif
+  }
+  
 }
 
 void checkFirstTime() {
@@ -96,5 +108,25 @@ void checkFirstTime() {
       for(uint8_t i=0;i<3;i++) conf.Smoothing[i] = s[i];
     }
   #endif
+  #if defined (FAILSAFE)
+    conf.failsave_throttle = FAILSAVE_THROTTLE;
+  #endif
+  #ifdef VBAT
+    conf.vbatscale = VBATSCALE;
+    conf.vbatlevel1_3s = VBATLEVEL1_3S;
+    conf.vbatlevel2_3s = VBATLEVEL2_3S;
+    conf.vbatlevel3_3s = VBATLEVEL3_3S;
+    conf.vbatlevel4_3s = VBATLEVEL4_3S;
+    conf.no_vbat = NO_VBAT;
+  #endif
+  #ifdef POWERMETER
+    conf.psensornull = PSENSORNULL;
+    //conf.pleveldivsoft = PLEVELDIVSOFT; // not neccessary; this gets set in the eeprom read function
+    conf.pleveldiv = PLEVELDIV;
+    conf.pint2ma = PINT2mA;
+  #endif
+#ifdef CYCLETIME_FIXATED
+  conf.cycletime_fixated = CYCLETIME_FIXATED;
+#endif
   writeParams(0); // this will also (p)reset checkNewConf with the current version number again.
 }

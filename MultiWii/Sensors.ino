@@ -37,6 +37,11 @@
   //#define MPU6050_ADDRESS     0x69 // address pin AD0 high (VCC)
 #endif
 
+#if !defined(MPU3050_ADDRESS)
+  #define MPU3050_ADDRESS     0x68 // Switch in "ON" position
+  //#define MPU3050_ADDRESS     0x69 // Switch in "1" position
+#endif
+
 #if !defined(MS561101BA_ADDRESS) 
   #define MS561101BA_ADDRESS 0x77 //CBR=0 0xEE I2C address when pin CSB is connected to LOW (GND)
   //#define MS561101BA_ADDRESS 0x76 //CBR=1 0xEC I2C address when pin CSB is connected to HIGH (VCC)
@@ -102,6 +107,34 @@
     #define MPU6050_DLPF_CFG   0
 #endif
 
+//MPU3050 Gyro LPF setting
+#if defined(MPU3050_LPF_256HZ) || defined(MPU3050_LPF_188HZ) || defined(MPU3050_LPF_98HZ) || defined(MPU3050_LPF_42HZ) || defined(MPU3050_LPF_20HZ) || defined(MPU3050_LPF_10HZ) || defined(MPU3050_LPF_5HZ)
+  #if defined(MPU3050_LPF_256HZ)
+    #define MPU3050_DLPF_CFG   0
+  #endif
+  #if defined(MPU3050_LPF_188HZ)
+    #define MPU3050_DLPF_CFG   1
+  #endif
+  #if defined(MPU3050_LPF_98HZ)
+    #define MPU3050_DLPF_CFG   2
+  #endif
+  #if defined(MPU3050_LPF_42HZ)
+    #define MPU3050_DLPF_CFG   3
+  #endif
+  #if defined(MPU3050_LPF_20HZ)
+    #define MPU3050_DLPF_CFG   4
+  #endif
+  #if defined(MPU3050_LPF_10HZ)
+    #define MPU3050_DLPF_CFG   5
+  #endif
+  #if defined(MPU3050_LPF_5HZ)
+    #define MPU3050_DLPF_CFG   6
+  #endif
+#else
+    //Default settings LPF 256Hz/8000Hz sample
+    #define MPU3050_DLPF_CFG   0
+#endif
+
 #if defined(TINY_GPS) | defined(TINY_GPS_SONAR)
 #define TINY_GPS_TWI_ADD 0x11
 #include "tinygps.h"
@@ -138,7 +171,7 @@ void i2c_stop(void) {
   //  while(TWCR & (1<<TWSTO));                // <- can produce a blocking state with some WMP clones
 }
 
-void i2c_write(uint8_t data ) {	
+void i2c_write(uint8_t data ) {
   TWDR = data;                                 // send data to the previously addressed device
   TWCR = (1<<TWINT) | (1<<TWEN);
   waitTransmissionI2C();
@@ -174,7 +207,7 @@ void waitTransmissionI2C() {
 }
 
 size_t i2c_read_to_buf(uint8_t add, void *buf, size_t size) {
-  i2c_rep_start((add<<1) | 1);	// I2C read direction
+  i2c_rep_start((add<<1) | 1);  // I2C read direction
   size_t bytes_read = 0;
   uint8_t *b = (uint8_t*)buf;
   while (size--) {
@@ -233,7 +266,7 @@ void GYRO_Common() {
   static int16_t previousGyroADC[3] = {0,0,0};
   static int32_t g[3];
   uint8_t axis;
-  
+
 #if defined MMGYRO       
   // Moving Average Gyros by Magnetron1
   //---------------------------------------------------
@@ -255,6 +288,9 @@ void GYRO_Common() {
       if (calibratingG == 1) {
         gyroZero[axis]=g[axis]/400;
         blinkLED(10,15,1);
+      #if defined(BUZZER)
+        beep_confirmation = 4;
+      #endif
       }
     }
     calibratingG--;
@@ -277,6 +313,17 @@ void GYRO_Common() {
 #endif    
     previousGyroADC[axis] = gyroADC[axis];
   }
+
+  #if defined(SENSORS_TILT_45DEG_LEFT)
+    int16_t temp  = ((gyroADC[PITCH] - gyroADC[ROLL] )*7)/10;
+    gyroADC[ROLL] = ((gyroADC[ROLL]  + gyroADC[PITCH])*7)/10;
+    gyroADC[PITCH]= temp;
+  #endif
+  #if defined(SENSORS_TILT_45DEG_RIGHT)
+    int16_t temp  = ((gyroADC[PITCH] + gyroADC[ROLL] )*7)/10;
+    gyroADC[ROLL] = ((gyroADC[ROLL]  - gyroADC[PITCH])*7)/10;
+    gyroADC[PITCH]= temp;
+  #endif
 }
 
 // ****************
@@ -333,7 +380,7 @@ void ACC_Common() {
           AccInflightCalibrationActive = 0;
           AccInflightCalibrationMeasurementDone = 1;
           #if defined(BUZZER)
-            toggleBeep = 2;      //buzzer for indicatiing the end of calibration
+            beep_confirmation = 1;      //buzzer for indicatiing the end of calibration
           #endif
           // recover saved values to maintain current flight behavior until new values are transferred
           conf.accZero[ROLL]  = accZero_saved[ROLL] ;
@@ -358,6 +405,17 @@ void ACC_Common() {
   accADC[ROLL]  -=  conf.accZero[ROLL] ;
   accADC[PITCH] -=  conf.accZero[PITCH];
   accADC[YAW]   -=  conf.accZero[YAW] ;
+
+  #if defined(SENSORS_TILT_45DEG_LEFT)
+    int16_t temp = ((accADC[PITCH] - accADC[ROLL] )*7)/10;
+    accADC[ROLL] = ((accADC[ROLL]  + accADC[PITCH])*7)/10;
+    accADC[PITCH] = temp;
+  #endif
+  #if defined(SENSORS_TILT_45DEG_RIGHT)
+    int16_t temp = ((accADC[PITCH] + accADC[ROLL] )*7)/10;
+    accADC[ROLL] = ((accADC[ROLL]  - accADC[PITCH])*7)/10;
+    accADC[PITCH] = temp;
+  #endif
 }
 
 
@@ -973,6 +1031,17 @@ void Mag_getADC() {
         conf.magZero[axis] = (magZeroTempMin[axis] + magZeroTempMax[axis])/2;
       writeParams(1);
     }
+  } else {
+    #if defined(SENSORS_TILT_45DEG_LEFT)
+      int16_t temp = ((magADC[PITCH] - magADC[ROLL] )*7)/10;
+      magADC[ROLL] = ((magADC[ROLL]  + magADC[PITCH])*7)/10;
+      magADC[PITCH] = temp;
+    #endif
+    #if defined(SENSORS_TILT_45DEG_RIGHT)
+      int16_t temp = ((magADC[PITCH] + magADC[ROLL] )*7)/10;
+      magADC[ROLL] = ((magADC[ROLL]  - magADC[PITCH])*7)/10;
+      magADC[PITCH] = temp;
+    #endif
   }
 }
 #endif
@@ -1117,8 +1186,8 @@ void Gyro_init() {
 void Gyro_getADC () {
   i2c_getSixRawADC(MPU6050_ADDRESS, 0x43);
   GYRO_ORIENTATION( ((rawADC[0]<<8) | rawADC[1])/4 , // range: +/- 8192; +/- 2000 deg/sec
-	            ((rawADC[2]<<8) | rawADC[3])/4 ,
-	            ((rawADC[4]<<8) | rawADC[5])/4 );
+                    ((rawADC[2]<<8) | rawADC[3])/4 ,
+                    ((rawADC[4]<<8) | rawADC[5])/4 );
   GYRO_Common();
 }
 
@@ -1174,6 +1243,30 @@ void ACC_getADC () {
     }
   #endif
 #endif
+
+// ************************************************************************************************************
+// I2C Gyroscope MPU3050
+// ************************************************************************************************************
+#if defined(MPU3050)
+
+void Gyro_init() {
+  TWBR = ((F_CPU / 400000L) - 16) / 2; // change the I2C clock rate to 400kHz
+  i2c_writeReg(MPU3050_ADDRESS, 0x3E, 0x80);             //PWR_MGMT_1    -- DEVICE_RESET 1
+  delay(5);
+  i2c_writeReg(MPU3050_ADDRESS, 0x3E, 0x03);             //PWR_MGMT_1    -- SLEEP 0; CYCLE 0; TEMP_DIS 0; CLKSEL 3 (PLL with Z Gyro reference)
+  i2c_writeReg(MPU3050_ADDRESS, 0x16, MPU3050_DLPF_CFG + 0x18); // Gyro CONFIG   -- EXT_SYNC_SET 0 (disable input pin for data sync) ; default DLPF_CFG = 0 => GYRO bandwidth = 256Hz); -- FS_SEL = 3: Full scale set to 2000 deg/sec
+}
+
+void Gyro_getADC () {
+  i2c_getSixRawADC(MPU3050_ADDRESS, 0x1D);
+  GYRO_ORIENTATION( ((rawADC[0]<<8) | rawADC[1])/4 , // range: +/- 8192; +/- 2000 deg/sec
+                    ((rawADC[2]<<8) | rawADC[3])/4 ,
+                    ((rawADC[4]<<8) | rawADC[5])/4 );
+  GYRO_Common();
+}
+
+#endif
+
 
 #if defined(WMP) || defined(NUNCHUCK)
 // ************************************************************************************************************
@@ -1359,6 +1452,9 @@ void i2c_srf08_change_addr(int8_t current, int8_t moveto) {
   i2c_writeReg(current, SRF08_REV_COMMAND, 0xA5);  delay(30);
   i2c_writeReg(current, SRF08_REV_COMMAND, moveto);  delay(30); // now change i2c address
   blinkLED(5,1,2);
+  #if defined(BUZZER)
+   beep_confirmation = 2;
+  #endif
 }
 
 // discover previously known sensors and any new sensor (move new sensors to assigned area)
