@@ -30,15 +30,15 @@ static uint8_t inBuf[INBUF_SIZE][UART_NUMBER];
 #define MSP_VERSION              0
 
 #define MSP_IDENT                100   //out message         multitype + multiwii version + protocol version + capability variable
-#define MSP_STATUS               101   //out message         cycletime & errors_count & sensor present & box activation
+#define MSP_STATUS               101   //out message         cycletime & errors_count & sensor present & box activation & current setting number
 #define MSP_RAW_IMU              102   //out message         9 DOF
 #define MSP_SERVO                103   //out message         8 servos
 #define MSP_MOTOR                104   //out message         8 motors
 #define MSP_RC                   105   //out message         8 rc chan
-#define MSP_RAW_GPS              106   //out message         fix, numsat, lat, lon, alt, speed
+#define MSP_RAW_GPS              106   //out message         fix, numsat, lat, lon, alt, speed, ground course
 #define MSP_COMP_GPS             107   //out message         distance home, direction home
 #define MSP_ATTITUDE             108   //out message         2 angles 1 heading
-#define MSP_ALTITUDE             109   //out message         1 altitude
+#define MSP_ALTITUDE             109   //out message         altitude, variometer
 #define MSP_BAT                  110   //out message         vbat, powermetersum
 #define MSP_RC_TUNING            111   //out message         rc rate, rc expo, rollpitch rate, yaw rate, dyn throttle PID
 #define MSP_PID                  112   //out message         up to 16 P I D (8 are used)
@@ -59,6 +59,7 @@ static uint8_t inBuf[INBUF_SIZE][UART_NUMBER];
 #define MSP_SET_MISC             207   //in message          powermeter trig + 8 free for future use
 #define MSP_RESET_CONF           208   //in message          no param
 #define MSP_WP_SET               209   //in message          sets a given WP (WP#,lat, lon, alt, flags)
+#define MSP_SELECT_SETTING       210   //in message          Select Setting Number (0-2)
 
 #define MSP_SPEK_BIND            240   //in message          no param
 
@@ -237,6 +238,15 @@ void evaluateCommand() {
      #endif
      headSerialReply(0);
      break;
+   case MSP_SELECT_SETTING:
+     if(!f.ARMED) {
+       global_conf.currentSet = read8();
+       if(global_conf.currentSet>2) global_conf.currentSet = 0;
+       writeGlobalSet(0);
+       readEEPROM();
+     }
+     headSerialReply(0);
+     break;
    case MSP_IDENT:
      headSerialReply(7);
      serialize8(VERSION);   // multiwii version
@@ -245,7 +255,7 @@ void evaluateCommand() {
      serialize32(0);        // "capability"
      break;
    case MSP_STATUS:
-     headSerialReply(10);
+     headSerialReply(11);
      serialize16(cycleTime);
      serialize16(i2c_errors_count);
      serialize16(ACC|BARO<<1|MAG<<2|GPS<<3|SONAR<<4);
@@ -260,7 +270,7 @@ void evaluateCommand() {
                  #if MAG
                    f.MAG_MODE<<BOXMAG|f.HEADFREE_MODE<<BOXHEADFREE|rcOptions[BOXHEADADJ]<<BOXHEADADJ|
                  #endif
-                 #if defined(SERVO_TILT) || defined(GIMBAL)
+                 #if defined(SERVO_TILT) || defined(GIMBAL)|| defined(SERVO_MIX_TILT)
                    rcOptions[BOXCAMSTAB]<<BOXCAMSTAB|
                  #endif
                  #if defined(CAMTRIG)
@@ -282,6 +292,7 @@ void evaluateCommand() {
                    rcOptions[BOXLLIGHTS]<<BOXLLIGHTS |
                  #endif
                  f.ARMED<<BOXARM);
+       serialize8(global_conf.currentSet);   // current setting
      break;
    case MSP_RAW_IMU:
      headSerialReply(18);
@@ -310,13 +321,14 @@ void evaluateCommand() {
      break;
    #if GPS
    case MSP_RAW_GPS:
-     headSerialReply(14);
+     headSerialReply(16);
      serialize8(f.GPS_FIX);
      serialize8(GPS_numSat);
      serialize32(GPS_coord[LAT]);
      serialize32(GPS_coord[LON]);
      serialize16(GPS_altitude);
      serialize16(GPS_speed);
+     serialize16(GPS_ground_course);        // added since r1172
      break;
    case MSP_COMP_GPS:
      headSerialReply(5);
@@ -332,8 +344,9 @@ void evaluateCommand() {
      serialize16(headFreeModeHold);
      break;
    case MSP_ALTITUDE:
-     headSerialReply(4);
+     headSerialReply(6);
      serialize32(EstAlt);
+     serialize16(vario);                  // added since r1172
      break;
    case MSP_BAT:
      headSerialReply(3);
@@ -405,10 +418,7 @@ void evaluateCommand() {
      break;  
    #endif
    case MSP_RESET_CONF:
-     if(!f.ARMED) {
-       conf.checkNewConf++;
-       checkFirstTime();
-     }
+     if(!f.ARMED) LoadDefaults();
      headSerialReply(0);
      break;
    case MSP_ACC_CALIBRATION:
@@ -419,7 +429,7 @@ void evaluateCommand() {
      if(!f.ARMED) f.CALIBRATE_MAG = 1;
      headSerialReply(0);
      break;
- #if defined(SPEKTRUM)
+#if defined(SPEK_BIND)
    case MSP_SPEK_BIND:
      spekBind();  
      headSerialReply(0);

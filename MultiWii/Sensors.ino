@@ -289,7 +289,7 @@ void GYRO_Common() {
         gyroZero[axis]=g[axis]/400;
         blinkLED(10,15,1);
       #if defined(BUZZER)
-        beep_confirmation = 4;
+        notification_confirmation = 4;
       #endif
       }
     }
@@ -340,16 +340,16 @@ void ACC_Common() {
       a[axis] +=accADC[axis];
       // Clear global variables for next reading
       accADC[axis]=0;
-      conf.accZero[axis]=0;
+      global_conf.accZero[axis]=0;
     }
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
     if (calibratingA == 1) {
-      conf.accZero[ROLL]  = a[ROLL]/400;
-      conf.accZero[PITCH] = a[PITCH]/400;
-      conf.accZero[YAW]   = a[YAW]/400-acc_1G; // for nunchuk 200=1G
+      global_conf.accZero[ROLL]  = a[ROLL]/400;
+      global_conf.accZero[PITCH] = a[PITCH]/400;
+      global_conf.accZero[YAW]   = a[YAW]/400-acc_1G; // for nunchuk 200=1G
       conf.angleTrim[ROLL]   = 0;
       conf.angleTrim[PITCH]  = 0;
-      writeParams(1); // write accZero in EEPROM
+      writeGlobalSet(1); // write accZero in EEPROM
     }
     calibratingA--;
   }
@@ -359,10 +359,10 @@ void ACC_Common() {
       static int16_t  angleTrim_saved[2] = {0, 0};
       //Saving old zeropoints before measurement
       if (InflightcalibratingA==50) {
-         accZero_saved[ROLL]  = conf.accZero[ROLL] ;
-         accZero_saved[PITCH] = conf.accZero[PITCH];
-         accZero_saved[YAW]   = conf.accZero[YAW] ;
-         angleTrim_saved[ROLL] = conf.angleTrim[ROLL] ;
+         accZero_saved[ROLL]  = global_conf.accZero[ROLL] ;
+         accZero_saved[PITCH] = global_conf.accZero[PITCH];
+         accZero_saved[YAW]   = global_conf.accZero[YAW] ;
+         angleTrim_saved[ROLL]  = conf.angleTrim[ROLL] ;
          angleTrim_saved[PITCH] = conf.angleTrim[PITCH] ;
       }
       if (InflightcalibratingA>0) {
@@ -373,20 +373,20 @@ void ACC_Common() {
           b[axis] +=accADC[axis];
           // Clear global variables for next reading
           accADC[axis]=0;
-          conf.accZero[axis]=0;
+          global_conf.accZero[axis]=0;
         }
         //all values are measured
         if (InflightcalibratingA == 1) {
           AccInflightCalibrationActive = 0;
           AccInflightCalibrationMeasurementDone = 1;
           #if defined(BUZZER)
-            beep_confirmation = 1;      //buzzer for indicatiing the end of calibration
+            notification_confirmation = 1;      //buzzer for indicatiing the end of calibration
           #endif
           // recover saved values to maintain current flight behavior until new values are transferred
-          conf.accZero[ROLL]  = accZero_saved[ROLL] ;
-          conf.accZero[PITCH] = accZero_saved[PITCH];
-          conf.accZero[YAW]   = accZero_saved[YAW] ;
-          conf.angleTrim[ROLL] = angleTrim_saved[ROLL] ;
+          global_conf.accZero[ROLL]  = accZero_saved[ROLL] ;
+          global_conf.accZero[PITCH] = accZero_saved[PITCH];
+          global_conf.accZero[YAW]   = accZero_saved[YAW] ;
+          conf.angleTrim[ROLL]  = angleTrim_saved[ROLL] ;
           conf.angleTrim[PITCH] = angleTrim_saved[PITCH] ;
         }
         InflightcalibratingA--;
@@ -394,17 +394,17 @@ void ACC_Common() {
       // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
       if (AccInflightCalibrationSavetoEEProm == 1){  //the copter is landed, disarmed and the combo has been done again
         AccInflightCalibrationSavetoEEProm = 0;
-        conf.accZero[ROLL]  = b[ROLL]/50;
-        conf.accZero[PITCH] = b[PITCH]/50;
-        conf.accZero[YAW]   = b[YAW]/50-acc_1G; // for nunchuk 200=1G
+        global_conf.accZero[ROLL]  = b[ROLL]/50;
+        global_conf.accZero[PITCH] = b[PITCH]/50;
+        global_conf.accZero[YAW]   = b[YAW]/50-acc_1G; // for nunchuk 200=1G
         conf.angleTrim[ROLL]   = 0;
         conf.angleTrim[PITCH]  = 0;
-        writeParams(1); // write accZero in EEPROM
+        writeGlobalSet(1); // write accZero in EEPROM
       }
   #endif
-  accADC[ROLL]  -=  conf.accZero[ROLL] ;
-  accADC[PITCH] -=  conf.accZero[PITCH];
-  accADC[YAW]   -=  conf.accZero[YAW] ;
+  accADC[ROLL]  -=  global_conf.accZero[ROLL] ;
+  accADC[PITCH] -=  global_conf.accZero[PITCH];
+  accADC[YAW]   -=  global_conf.accZero[YAW] ;
 
   #if defined(SENSORS_TILT_45DEG_LEFT)
     int16_t temp = ((accADC[PITCH] - accADC[ROLL] )*7)/10;
@@ -462,9 +462,11 @@ void i2c_BMP085_readCalibration(){
 void  Baro_init() {
   delay(10);
   i2c_BMP085_readCalibration();
-  i2c_BMP085_UT_Start(); 
   delay(5);
-  i2c_BMP085_UT_Read();
+  i2c_BMP085_UT_Start(); 
+//  delay(5);
+//  i2c_BMP085_UT_Read();
+  bmp085_ctx.deadline = currentTime+5000;
 }
 
 // read uncompensated temperature value: send command first
@@ -527,10 +529,24 @@ void i2c_BMP085_Calculate() {
   pressure = p + ((x1 + x2 + 3791) >> 4);
 }
 
-void Baro_update() {
+void Baro_update() {                   // first UT conversion is started in init procedure
   if (currentTime < bmp085_ctx.deadline) return; 
-  bmp085_ctx.deadline = currentTime;
+  bmp085_ctx.deadline = currentTime+6000;
   TWBR = ((F_CPU / 400000L) - 16) / 2; // change the I2C clock rate to 400kHz, BMP085 is ok with this speed
+  if (bmp085_ctx.state == 0) {
+    i2c_BMP085_UT_Read(); 
+    i2c_BMP085_UP_Start(); 
+    bmp085_ctx.state = 1; 
+    BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f; //centimeter   , moved here for less timecycle spike
+    bmp085_ctx.deadline += 8000;   // 6000+8000=14000
+  } else {
+    i2c_BMP085_UP_Read(); 
+    i2c_BMP085_UT_Start(); 
+    i2c_BMP085_Calculate(); 
+//    BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f; //centimeter
+    bmp085_ctx.state = 0; 
+  } 
+/*
   switch (bmp085_ctx.state) {
     case 0: 
       i2c_BMP085_UT_Start(); 
@@ -551,6 +567,7 @@ void Baro_update() {
       bmp085_ctx.state = 0; bmp085_ctx.deadline += 5000; 
       break;
   } 
+*/  
 }
 #endif
 
@@ -609,6 +626,9 @@ void  Baro_init() {
   i2c_MS561101BA_reset();
   delay(100);
   i2c_MS561101BA_readCalibration();
+  delay(10);
+  i2c_MS561101BA_UT_Start(); 
+  ms561101ba_ctx.deadline = currentTime+10000; 
 }
 
 // read uncompensated temperature value: send command first
@@ -670,30 +690,22 @@ void i2c_MS561101BA_Calculate() {
   pressure     = (( (ms561101ba_ctx.up.val * sens ) >> 21) - off) >> 15;
 }
 
-void Baro_update() {
+void Baro_update() {                            // first UT conversion is started in init procedure
   if (currentTime < ms561101ba_ctx.deadline) return; 
-  ms561101ba_ctx.deadline = currentTime;
-  TWBR = ((F_CPU / 400000L) - 16) / 2; // change the I2C clock rate to 400kHz, MS5611 is ok with this speed
-  switch (ms561101ba_ctx.state) {
-    case 0: 
-      i2c_MS561101BA_UT_Start(); 
-      ms561101ba_ctx.state++; ms561101ba_ctx.deadline += 10000; //according to the specs, the pause should be at least 8.22ms
-      break;
-    case 1: 
-      i2c_MS561101BA_UT_Read(); 
-      ms561101ba_ctx.state++;
-      break;
-    case 2: 
-      i2c_MS561101BA_UP_Start(); 
-      ms561101ba_ctx.state++; ms561101ba_ctx.deadline += 10000; //according to the specs, the pause should be at least 8.22ms
-      break;
-    case 3: 
-      i2c_MS561101BA_UP_Read();
-      i2c_MS561101BA_Calculate();
-      BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f; //centimeter
-      ms561101ba_ctx.state = 0; ms561101ba_ctx.deadline += 4000;
-      break;
-  } 
+  ms561101ba_ctx.deadline = currentTime+10000;  // UT and UP conversion take 8.5ms so we do next reading after 10ms 
+  TWBR = ((F_CPU / 400000L) - 16) / 2;          // change the I2C clock rate to 400kHz, MS5611 is ok with this speed
+  if (ms561101ba_ctx.state == 0) {
+    i2c_MS561101BA_UT_Read(); 
+    i2c_MS561101BA_UP_Start(); 
+    BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f; //centimeter  , moved here for less timecycle spike
+    ms561101ba_ctx.state = 1; 
+  } else {
+    i2c_MS561101BA_UP_Read();
+    i2c_MS561101BA_UT_Start(); 
+    i2c_MS561101BA_Calculate();
+//    BaroAlt = (1.0f - pow(pressure/101325.0f, 0.190295f)) * 4433000.0f; //centimeter
+    ms561101ba_ctx.state = 0; 
+  }  
 }
 #endif
 
@@ -1006,16 +1018,16 @@ void Mag_getADC() {
   if (f.CALIBRATE_MAG) {
     tCal = t;
     for(axis=0;axis<3;axis++) {
-      conf.magZero[axis] = 0;
+      global_conf.magZero[axis] = 0;
       magZeroTempMin[axis] = magADC[axis];
       magZeroTempMax[axis] = magADC[axis];
     }
     f.CALIBRATE_MAG = 0;
   }
   if (magInit) { // we apply offset only once mag calibration is done
-    magADC[ROLL]  -= conf.magZero[ROLL];
-    magADC[PITCH] -= conf.magZero[PITCH];
-    magADC[YAW]   -= conf.magZero[YAW];
+    magADC[ROLL]  -= global_conf.magZero[ROLL];
+    magADC[PITCH] -= global_conf.magZero[PITCH];
+    magADC[YAW]   -= global_conf.magZero[YAW];
   }
  
   if (tCal != 0) {
@@ -1028,8 +1040,8 @@ void Mag_getADC() {
     } else {
       tCal = 0;
       for(axis=0;axis<3;axis++)
-        conf.magZero[axis] = (magZeroTempMin[axis] + magZeroTempMax[axis])/2;
-      writeParams(1);
+        global_conf.magZero[axis] = (magZeroTempMin[axis] + magZeroTempMax[axis])/2;
+      writeGlobalSet(1);
     }
   } else {
     #if defined(SENSORS_TILT_45DEG_LEFT)
@@ -1453,7 +1465,7 @@ void i2c_srf08_change_addr(int8_t current, int8_t moveto) {
   i2c_writeReg(current, SRF08_REV_COMMAND, moveto);  delay(30); // now change i2c address
   blinkLED(5,1,2);
   #if defined(BUZZER)
-   beep_confirmation = 2;
+   notification_confirmation = 2;
   #endif
 }
 

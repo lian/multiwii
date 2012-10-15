@@ -54,7 +54,7 @@ enum box {
   #if MAG
     BOXMAG,
   #endif
-  #if defined(SERVO_TILT) || defined(GIMBAL)
+  #if defined(SERVO_TILT) || defined(GIMBAL)  || defined(SERVO_MIX_TILT)
     BOXCAMSTAB,
   #endif
   #if defined(CAMTRIG)
@@ -97,7 +97,7 @@ const char boxnames[] PROGMEM = // names for dynamic generation of config GUI
   #if MAG
     "MAG;"
   #endif
-  #if defined(SERVO_TILT) || defined(GIMBAL)
+  #if defined(SERVO_TILT) || defined(GIMBAL)|| defined(SERVO_MIX_TILT)
     "CAMSTAB;"
   #endif
   #if defined(CAMTRIG)
@@ -159,9 +159,8 @@ static int32_t  EstAlt;             // in cm
 static int16_t  BaroPID = 0;
 static int32_t  AltHold;
 static int16_t  errorAltitudeI = 0;
-#if defined(BUZZER)
-  static uint8_t  toggleBeep = 0;
-#endif
+static int16_t  vario = 0;              // variometer in cm/s
+
 #if defined(ARMEDTIMEWARNING)
   static uint32_t  ArmedTimeWarningMicroSeconds = 0;
 #endif
@@ -282,6 +281,15 @@ static int16_t motor[NUMBER_MOTOR];
 // EEPROM Layout definition
 // ************************
 static uint8_t dynP8[3], dynD8[3];
+
+static struct {
+  uint8_t currentSet;
+  int16_t accZero[3];
+  int16_t magZero[3];
+  uint8_t checksum;      // MUST BE ON LAST POSITION OF STRUCTURE ! 
+} global_conf;
+
+
 static struct {
   uint8_t checkNewConf;
   uint8_t P8[PIDITEMS], I8[PIDITEMS], D8[PIDITEMS];
@@ -292,8 +300,6 @@ static struct {
   uint8_t dynThrPID;
   uint8_t thrMid8;
   uint8_t thrExpo8;
-  int16_t accZero[3];
-  int16_t magZero[3];
   int16_t angleTrim[2];
   uint16_t activate[CHECKBOXITEMS];
   uint8_t powerTrigger1;
@@ -330,6 +336,7 @@ static struct {
   #ifdef CYCLETIME_FIXATED
     uint16_t cycletime_fixated;
   #endif
+  uint8_t  checksum;      // MUST BE ON LAST POSITION OF CONF STRUCTURE ! 
 } conf;
 
 
@@ -379,11 +386,10 @@ static struct {
   #define NAV_MODE_POSHOLD       1
   #define NAV_MODE_WP            2
   static uint8_t nav_mode = NAV_MODE_NONE;            //Navigation mode
-
-  #if defined(BUZZER)  
-    static uint8_t beep_toggle = 0,
-                   beep_confirmation = 0;
-  #endif
+ 
+  static uint8_t notification_toggle = 0,
+                 notification_confirmation = 0;
+ 
 
 
 void annexCode() { // this code is excetuted at each loop and won't interfere with control loop if it lasts less than 650 microseconds
@@ -590,9 +596,16 @@ void setup() {
   STABLEPIN_PINMODE;
   POWERPIN_OFF;
   initOutput();
-  readEEPROM();
-  checkFirstTime();
+  for(global_conf.currentSet=0; global_conf.currentSet<3; global_conf.currentSet++) {  // check all settings integrity
+    readEEPROM();
+  }
+  readGlobalSet();
+  readEEPROM();                                    // load current setting data
+  blinkLED(2,40,global_conf.currentSet+1);          
   configureReceiver();
+  #if defined (PILOTLAMP) 
+    PL_INIT;
+  #endif
   #if defined(OPENLRSv2MULTI)
     initOpenLRS();
   #endif
@@ -682,8 +695,6 @@ void loop () {
     Read_OpenLRS_RC();
   #endif 
 
-  #define RC_FREQ 50
-
   if (currentTime > rcTime ) { // 50Hz
     rcTime = currentTime + 20000;
     computeRC();
@@ -709,12 +720,37 @@ void loop () {
       errorGyroI[ROLL] = 0; errorGyroI[PITCH] = 0; errorGyroI[YAW] = 0;
       errorAngleI[ROLL] = 0; errorAngleI[PITCH] = 0;
       rcDelayCommand++;
-      if (rcData[YAW] < MINCHECK && rcData[PITCH] < MINCHECK && !f.ARMED) {
-        if (rcDelayCommand == 20) {
+      if (rcData[YAW] < MINCHECK && !f.ARMED) {            // THTOTTLE min, YAW left
+        #if defined(INFLIGHT_ACC_CALIBRATION)  
+          if (rcData[PITCH] > MAXCHECK && rcData[ROLL] > MAXCHECK && rcDelayCommand == 20){
+            if (AccInflightCalibrationMeasurementDone){                // trigger saving into eeprom after landing
+              AccInflightCalibrationMeasurementDone = 0;
+              AccInflightCalibrationSavetoEEProm = 1;
+            }else{ 
+              AccInflightCalibrationArmed = !AccInflightCalibrationArmed; 
+              #if defined(BUZZER)
+                if (AccInflightCalibrationArmed)  notification_toggle = 2;
+                else notification_toggle = 3;
+              #endif
+            }
+            
+         } 
+       #endif
+       if(rcData[PITCH] < MINCHECK && rcDelayCommand == 20) {                              // PITCH down -> GYRO cal
           calibratingG=400;
           #if GPS 
             GPS_reset_home_position();
           #endif
+        }
+        i = 0;
+        if(rcData[ROLL]  < MINCHECK && rcData[PITCH] > 1300 && rcData[PITCH] < 1700) i=1;    // ROLL left  -> SET 1
+        if(rcData[PITCH] > MAXCHECK && rcData[ROLL]  > 1300 && rcData[ROLL]  < 1700) i=2;    // PITCH up   -> SET 2
+        if(rcData[ROLL]  > MAXCHECK && rcData[PITCH] > 1300 && rcData[PITCH] < 1700) i=3;    // ROLL right -> SET 3
+        if(i && rcDelayCommand == 20) {
+          global_conf.currentSet = i-1;
+          writeGlobalSet(0);
+          readEEPROM();
+          blinkLED(2,40,i);
         }
       } else if (rcData[YAW] > MAXCHECK && rcData[PITCH] > MAXCHECK && !f.ARMED) {
         if (rcDelayCommand == 20) {
@@ -737,25 +773,6 @@ void loop () {
           previousTime = micros();
         }
       }
-      #if defined(INFLIGHT_ACC_CALIBRATION)  
-        else if (!f.ARMED && rcData[YAW] < MINCHECK && rcData[PITCH] > MAXCHECK && rcData[ROLL] > MAXCHECK){
-          if (rcDelayCommand == 20){
-            if (AccInflightCalibrationMeasurementDone){                // trigger saving into eeprom after landing
-              AccInflightCalibrationMeasurementDone = 0;
-              AccInflightCalibrationSavetoEEProm = 1;
-            }else{ 
-              AccInflightCalibrationArmed = !AccInflightCalibrationArmed; 
-              #if defined(BUZZER)
-              if (AccInflightCalibrationArmed){
-                beep_toggle = 2;
-              } else {
-                beep_toggle = 3;
-              }
-              #endif
-            }
-          }
-       } 
-     #endif
       else if (conf.activate[BOXARM] > 0) {
         if ( rcOptions[BOXARM] && f.OK_TO_ARM
         #if defined(FAILSAFE)

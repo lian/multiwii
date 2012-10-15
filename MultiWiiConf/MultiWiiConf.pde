@@ -48,9 +48,9 @@ private static final int ROLL = 0, PITCH = 1, YAW = 2, ALT = 3, VEL = 4, LEVEL =
 Numberbox confP[] = new Numberbox[PIDITEMS], confI[] = new Numberbox[PIDITEMS], confD[] = new Numberbox[PIDITEMS];
 int       byteP[] = new int[PIDITEMS],       byteI[] = new int[PIDITEMS],       byteD[] = new int[PIDITEMS];
 
-Numberbox confRC_RATE, confRC_EXPO, rollPitchRate, yawRate, dynamic_THR_PID, throttle_EXPO, throttle_MID, confPowerTrigger;
+Numberbox confRC_RATE, confRC_EXPO, rollPitchRate, yawRate, dynamic_THR_PID, throttle_EXPO, throttle_MID, confPowerTrigger, confSetting, confSelectSetting;
 
-int  byteRC_RATE,byteRC_EXPO, byteRollPitchRate,byteYawRate, byteDynThrPID,byteThrottle_EXPO, byteThrottle_MID;
+int  byteRC_RATE,byteRC_EXPO, byteRollPitchRate,byteYawRate, byteDynThrPID,byteThrottle_EXPO, byteThrottle_MID, byteSelectSetting;
 
 Slider rcStickThrottleSlider,rcStickRollSlider,rcStickPitchSlider,rcStickYawSlider,rcStickAUX1Slider,rcStickAUX2Slider,rcStickAUX3Slider,rcStickAUX4Slider;
 
@@ -63,7 +63,7 @@ Slider axSlider,aySlider,azSlider,gxSlider,gySlider,gzSlider , magxSlider,magySl
 
 Slider scaleSlider;
 
-Button buttonIMPORT,buttonSAVE,buttonREAD,buttonRESET,buttonWRITE,buttonCALIBRATE_ACC,buttonCALIBRATE_MAG,buttonSTART,buttonSTOP,
+Button buttonIMPORT,buttonSAVE,buttonREAD,buttonRESET,buttonWRITE,buttonCALIBRATE_ACC,buttonCALIBRATE_MAG,buttonSTART,buttonSTOP,buttonSETTING,
        buttonAcc,buttonBaro,buttonMag,buttonGPS,buttonSonar,buttonOptic,buttonSpekBind;
 
 Toggle tACC_ROLL, tACC_PITCH, tACC_Z, tGYRO_ROLL, tGYRO_PITCH, tGYRO_YAW, tBARO,tHEAD, tMAGX, tMAGY, tMAGZ, 
@@ -76,6 +76,7 @@ boolean graphEnable = false;
 int version,versionMisMatch;
 float gx,gy,gz,ax,ay,az,magx,magy,magz,alt,head,angx,angy,debug1,debug2,debug3,debug4;
 float angyLevelControl, angCalc;
+int horizonInstrSize;
 int i, j, blink;
 boolean blinkFlag;
 int GPS_distanceToHome, GPS_directionToHome,
@@ -277,6 +278,12 @@ void setup() {
   confRC_EXPO = controlP5.addNumberbox("RC EXPO",0,xParam+40,yParam+237,30,14);confRC_EXPO.setDecimalPrecision(2);confRC_EXPO.setMultiplier(0.01);confRC_EXPO.setLabel("");
   confRC_EXPO.setDirection(Controller.HORIZONTAL);confRC_EXPO.setMin(0);confRC_EXPO.setMax(1);confRC_EXPO.setColorBackground(red_);
 
+  confSetting = controlP5.addNumberbox("_SETTING",0,xParam+2,yParam+2,30,14);confSetting.setDecimalPrecision(0);confSetting.setMultiplier(1);confSetting.setLabel("");
+  confSetting.setDirection(Controller.HORIZONTAL);confSetting.setMin(0);confSetting.setMax(2);confSetting.setColorBackground(red_);
+
+  confSelectSetting = controlP5.addNumberbox("S_SETTING",0,xParam+520,yParam+260,30,14);confSelectSetting.setDecimalPrecision(0);confSelectSetting.setMultiplier(1);confSelectSetting.setLabel("");
+  confSelectSetting.setDirection(Controller.HORIZONTAL);confSelectSetting.setMin(0);confSelectSetting.setMax(2);confSelectSetting.setColorBackground(red_);
+
   throttle_MID = controlP5.addNumberbox("T MID",0.5,xParam+40,yParam+180,30,14);throttle_MID.setDecimalPrecision(2);throttle_MID.setMultiplier(0.01);throttle_MID.setLabel("");
   throttle_MID.setDirection(Controller.HORIZONTAL);throttle_MID.setMin(0);throttle_MID.setMax(1);throttle_MID.setColorBackground(red_);
   throttle_EXPO = controlP5.addNumberbox("T EXPO",0,xParam+40,yParam+197,30,14);throttle_EXPO.setDecimalPrecision(2);throttle_EXPO.setMultiplier(0.01);throttle_EXPO.setLabel("");
@@ -287,7 +294,8 @@ void setup() {
   buttonWRITE =         controlP5.addButton("WRITE",1,xParam+290,yParam+260,60,16);buttonWRITE.setColorBackground(red_);
   buttonCALIBRATE_ACC = controlP5.addButton("CALIB_ACC",1,xParam+210,yParam+260,70,16);buttonCALIBRATE_ACC.setColorBackground(red_);
   buttonCALIBRATE_MAG = controlP5.addButton("CALIB_MAG",1,xParam+130,yParam+260,70,16);buttonCALIBRATE_MAG.setColorBackground(red_);
-
+  buttonSETTING =       controlP5.addButton("SETTING",1,xParam+405,yParam+260,110,16); buttonSETTING.setLabel("SELECT SETTING"); buttonSETTING.setColorBackground(red_);
+  
   rcStickThrottleSlider = controlP5.addSlider("Throt",900,2100,1500,xRC,yRC,100,10);rcStickThrottleSlider.setDecimalPrecision(0);
   rcStickPitchSlider =    controlP5.addSlider("Pitch",900,2100,1500,xRC,yRC+15,100,10);rcStickPitchSlider.setDecimalPrecision(0);
   rcStickRollSlider =     controlP5.addSlider("Roll",900,2100,1500,xRC,yRC+30,100,10);rcStickRollSlider.setDecimalPrecision(0);
@@ -343,6 +351,7 @@ private static final int
   MSP_MAG_CALIBRATION      =206,
   MSP_SET_MISC             =207,
   MSP_RESET_CONF           =208,
+  MSP_SELECT_SETTING       =210,
   
   MSP_SPEK_BIND            =240,
 
@@ -377,7 +386,7 @@ int read16() {return (inBuf[p++]&0xff) + ((inBuf[p++])<<8); }
 int read8()  {return inBuf[p++]&0xff;}
 
 int mode;
-boolean toggleRead = false,toggleReset = false,toggleCalibAcc = false,toggleCalibMag = false,toggleWrite = false,toggleSpekBind = false;
+boolean toggleRead = false,toggleReset = false,toggleCalibAcc = false,toggleCalibMag = false,toggleWrite = false,toggleSpekBind = false,toggleSetSetting = false;
 
 //send msp without payload
 private List<Byte> requestMSP(int msp) {
@@ -452,7 +461,10 @@ public void evaluateCommand(byte cmd, int dataSize) {
         if ((present&16)>0) {buttonSonar.setColorBackground(green_);} else {buttonSonar.setColorBackground(red_);}
         for(i=0;i<CHECKBOXITEMS;i++) {
           if ((mode&(1<<i))>0) buttonCheckbox[i].setColorBackground(green_); else buttonCheckbox[i].setColorBackground(red_);
-        } break;
+        }
+        confSetting.setValue(read8());
+        confSetting.setColorBackground(green_);
+        break;
     case MSP_RAW_IMU:
         ax = read16();ay = read16();az = read16();
         gx = read16()/8;gy = read16()/8;gz = read16()/8;
@@ -602,12 +614,12 @@ void draw() {
       debug1Data.addVal(debug1);debug2Data.addVal(debug2);debug3Data.addVal(debug3);debug4Data.addVal(debug4);
     }
 
-    if ((time-time2)>40 && ! toggleRead && ! toggleWrite) {
+    if ((time-time2)>40 && ! toggleRead && ! toggleWrite && ! toggleSetSetting) {
       time2=time;
-      int[] requests = {MSP_IDENT, MSP_MOTOR_PINS, MSP_STATUS, MSP_RAW_IMU, MSP_SERVO, MSP_MOTOR, MSP_RC, MSP_RAW_GPS, MSP_COMP_GPS, MSP_ALTITUDE, MSP_BAT, MSP_DEBUGMSG, MSP_DEBUG};
+      int[] requests = {MSP_STATUS, MSP_RAW_IMU, MSP_SERVO, MSP_MOTOR, MSP_RC, MSP_RAW_GPS, MSP_COMP_GPS, MSP_ALTITUDE, MSP_BAT, MSP_DEBUGMSG, MSP_DEBUG};
       sendRequestMSP(requestMSP(requests));
     }
-    if ((time-time3)>20 && ! toggleRead && ! toggleWrite) {
+    if ((time-time3)>20 && ! toggleRead && ! toggleWrite && ! toggleSetSetting) {
       sendRequestMSP(requestMSP(MSP_ATTITUDE));
       time3=time;
     }
@@ -618,9 +630,18 @@ void draw() {
     }
     if (toggleRead) {
       toggleRead=false;
-      int[] requests = {MSP_BOXNAMES, MSP_PIDNAMES, MSP_RC_TUNING, MSP_PID, MSP_BOX, MSP_MISC };
+      int[] requests = {MSP_BOXNAMES, MSP_RC_TUNING, MSP_PID, MSP_BOX, MSP_MISC, MSP_IDENT, MSP_MOTOR_PINS }; // MSP_PIDNAMES
       sendRequestMSP(requestMSP(requests));
       buttonWRITE.setColorBackground(green_);
+      buttonSETTING.setColorBackground(green_);
+      confSelectSetting.setColorBackground(green_);
+    }
+    if (toggleSetSetting) {
+      toggleSetSetting=false;
+      toggleRead=true;
+      payload = new ArrayList<Character>();
+      payload.add(char( round(confSelectSetting.value())) );
+      sendRequestMSP(requestMSP(MSP_SELECT_SETTING,payload.toArray( new Character[payload.size()]) )); 
     }
     if (toggleCalibAcc) {
       toggleCalibAcc=false;
@@ -961,9 +982,9 @@ void draw() {
     motSlider[3].setPosition(xMot+10,yMot-15);motSlider[3].setHeight(60);motSlider[3].setCaptionLabel("FRONT_L");motSlider[3].show(); 
 
   } else if (multiType == 18) { //HEX6 H
-    drawMotor(+size, +1.2*size, byteMP[0], 'L');
+    drawMotor(+size, +1.2*size, byteMP[0], 'R');
     drawMotor(+size, -1.2*size, byteMP[1], 'L');
-    drawMotor(-size, +1.2*size, byteMP[2], 'R');
+    drawMotor(-size, +1.2*size, byteMP[2], 'L');
     drawMotor(-size, -1.2*size, byteMP[3], 'R');
     drawMotor(-size,         0, byteMP[4], 'L');
     drawMotor(+size,         0, byteMP[5], 'R');
@@ -1145,34 +1166,43 @@ void draw() {
   // ---------------------------------------------------------------------------------------------
   // Magnetron Combi Fly Level Control
   // ---------------------------------------------------------------------------------------------
-  angyLevelControl=((angy<-50) ? -50 : (angy>50) ? 50 : angy);
+  horizonInstrSize=68;
+  angyLevelControl=((angy<-horizonInstrSize) ? -horizonInstrSize : (angy>horizonInstrSize) ? horizonInstrSize : angy);
   pushMatrix();
   translate(xLevelObj,yLevelObj);
   noStroke();
   // instrument background
   fill(50,50,50);
   ellipse(0,0,150,150);
-  //arc(0,0,150,150,0,PI);
-  //rect(-75,0,75,-75);
   // full instrument
   rotate(-a);
   rectMode(CORNER);
   // outer border
   strokeWeight(1);
   stroke(90,90,90);
-  rect(-52,-52,104,104); //border ext
+  //border ext
+  arc(0,0,140,140,0,TWO_PI);
   stroke(190,190,190);
-  rect(-51,-51,102,102); //border int
+  //border int
+  arc(0,0,138,138,0,TWO_PI);
   // inner quadrant
   strokeWeight(1);
   stroke(255,255,255);
-  fill(30,140,200); 
-  rect(-50,-50,100,100); //sky 
-  fill(100,50,30); 
-  rect(-50,0-angyLevelControl,100,50+angyLevelControl); //earth
+  fill(124,73,31);
+  //earth
+  float angle = acos(angyLevelControl/horizonInstrSize);
+  arc(0,0,136,136,0,TWO_PI);
+  fill(38,139,224); 
+  //sky 
+  arc(0,0,136,136,HALF_PI-angle+PI,HALF_PI+angle+PI);
+  float x = sin(angle)*horizonInstrSize;
+  if (angy>0) 
+    fill(124,73,31);
+  noStroke();   
+  triangle(0,0,x,-angyLevelControl,-x,-angyLevelControl);
   // inner lines
   strokeWeight(1);
-  for(i=0;i<6;i++) {
+  for(i=0;i<8;i++) {
     j=i*15;
     if (angy<=(35-j) && angy>=(-65-j)) {
       stroke(255,255,255); line(-30,-15-j-angy,30,-15-j-angy); // up line
@@ -1204,26 +1234,19 @@ void draw() {
     text("0", 34, 4-angy); // center
     text("0", -39, 4-angy); // center
   }
-  // inner circle
-  noStroke();
-  fill(255,255,255,50);
-  ellipse(0,0,100,100);
-  arc(0,0,50,50,PI,TWO_PI);
+
   // lateral arrows
   strokeWeight(1);
   // down fixed triangle
   stroke(60,60,60);
-  fill(180,180,180,90);
-  triangle(-55,-8,-55,8,-42,0);
-  triangle(55,-8,55,8,42,0);
-  // upper mobile tringle
-  stroke(10,10,10);
   fill(180,180,180,255);
-  triangle(-55,-8-angyLevelControl,-55,8-angyLevelControl,-42,-angyLevelControl);
-  triangle(55,-8-angyLevelControl,55,8-angyLevelControl,42,-angyLevelControl);
+
+  triangle(-horizonInstrSize,-8,-horizonInstrSize,8,-55,0);
+  triangle(horizonInstrSize,-8,horizonInstrSize,8,55,0);
+
   // center
   strokeWeight(1);
-  stroke(255,120,10);
+  stroke(255,0,0);
   line(-20,0,-5,0); line(-5,0,-5,5);
   line(5,0,20,0); line(5,0,5,5);
   line(0,-5,0,5);
@@ -1498,6 +1521,10 @@ public void bSTOP() {
   graph_on=0;
 }
 
+public void SETTING() {
+  toggleSetSetting = true;
+}
+
 public void READ() {
   toggleRead = true;
 }
@@ -1532,7 +1559,7 @@ void InitSerial(float portValue) {
   } else {
     txtlblWhichcom.setValue("Comm Closed");
     init_com=0;
-    buttonSTART.setColorBackground(red_);buttonSTOP.setColorBackground(red_);commListbox.setColorBackground(red_);
+    buttonSTART.setColorBackground(red_);buttonSTOP.setColorBackground(red_);commListbox.setColorBackground(red_);buttonSETTING.setColorBackground(red_);
     graphEnable = false;
     init_com=0;
     g_serial.stop();
