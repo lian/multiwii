@@ -722,9 +722,15 @@ void initializeServo() {
         SOFT_PWM_CHANNEL1 += atomicPWM_PIN5_highState;
         state = 1;
       }else if(state == 1){
+        SOFT_PWM_CHANNEL1 += atomicPWM_PIN5_highState;
+        state = 2;
+      }else if(state == 2){
         SOFT_PWM_1_PIN_LOW;
         SOFT_PWM_CHANNEL1 += atomicPWM_PIN5_lowState;
-        state = 0;  
+        state = 3;  
+      }else if(state == 3){
+        SOFT_PWM_CHANNEL1 += atomicPWM_PIN5_lowState;
+        state = 0;   
       }
     }
     ISR(SOFT_PWM_ISR2) { 
@@ -734,9 +740,15 @@ void initializeServo() {
         SOFT_PWM_CHANNEL2 += atomicPWM_PIN6_highState;
         state = 1;
       }else if(state == 1){
+        SOFT_PWM_CHANNEL2 += atomicPWM_PIN6_highState;
+        state = 2;
+      }else if(state == 2){
         SOFT_PWM_2_PIN_LOW;
         SOFT_PWM_CHANNEL2 += atomicPWM_PIN6_lowState;
-        state = 0;  
+        state = 3;  
+      }else if(state == 3){
+        SOFT_PWM_CHANNEL2 += atomicPWM_PIN6_lowState;
+        state = 0;   
       }
     }
   #else
@@ -1073,6 +1085,9 @@ void mixTable() {
 /*************************************************************************************************************************/ 
 /*************************************************************************************************************************/    
     // ServoRates
+    #if !defined(USE_THROTTLESERVO)
+      motor[0]= rcData[THROTTLE];
+    #endif
     for(i=3;i<8;i++){
       servo[i]  = map(servo[i], SERVO_MIN, SERVO_MAX,servoLimit[i][0],servoLimit[i][1]);
       servo[i]  = constrain( servo[i], SERVO_MIN, SERVO_MAX);
